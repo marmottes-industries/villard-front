@@ -2,3 +2,4 @@
 /.idea
 /design.md
 /design
+.env.*
