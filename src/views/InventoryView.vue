@@ -1,62 +1,98 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { AxiosError } from 'axios'
 import AppTopbar from '@/components/shell/AppTopbar.vue'
 import Icon from '@/components/icons/Icon.vue'
 import InvRow from '@/components/inventory/InvRow.vue'
-import {
-  INVENTORY_MOCK,
-  INV_CATS,
-  type InvCategoryId,
-  type InvItem,
-  type InvState,
-} from '@/data/inventoryMock'
+import { useInventory } from '@/composable/useInventory'
+import { useCategories } from '@/composable/useCategories'
+import type { InventoryItem, InvState } from '@/api/inventory'
+import { STATE_FILTERS } from '@/utils/inventoryState'
 
-type CatFilter = InvCategoryId | 'all'
+type CatFilter = 'all' | string // 'all' ou IRI catégorie
 type StateFilter = InvState | 'all'
 
-const items = ref<InvItem[]>([...INVENTORY_MOCK])
+const inventory = useInventory()
+const categories = useCategories()
+
 const cat = ref<CatFilter>('all')
 const state = ref<StateFilter>('all')
 const query = ref('')
+const actionError = ref<string | null>(null)
+
+const initialState = computed(() => {
+  // Loading global = les deux ressources en cours de chargement initial.
+  if (inventory.state.value === 'loading' || categories.state.value === 'loading') return 'loading'
+  if (inventory.state.value === 'error') return 'error'
+  if (categories.state.value === 'error') return 'error'
+  return 'ready'
+})
 
 const counts = computed(() => ({
-  total: items.value.reduce((s, i) => s + i.qty, 0),
-  refs: items.value.length,
-  ok: items.value.filter(i => i.state === 'ok').length,
-  worn: items.value.filter(i => i.state === 'worn').length,
-  replace: items.value.filter(i => i.state === 'replace').length,
+  total: inventory.items.value.reduce((s, i) => s + i.quantity, 0),
+  refs: inventory.items.value.length,
+  ok: inventory.items.value.filter(i => i.state === 'ok').length,
+  worn: inventory.items.value.filter(i => i.state === 'worn').length,
+  replace: inventory.items.value.filter(i => i.state === 'replace').length,
 }))
 
-const filtered = computed<InvItem[]>(() => {
+const filtered = computed<InventoryItem[]>(() => {
   const q = query.value.trim().toLowerCase()
-  return items.value.filter(i =>
-    (cat.value === 'all' || i.cat === cat.value) &&
+  return inventory.items.value.filter(i =>
+    (cat.value === 'all' || i.category === cat.value) &&
     (state.value === 'all' || i.state === state.value) &&
-    (q === '' || `${i.name} ${i.loc} ${i.note}`.toLowerCase().includes(q)),
+    (q === '' || `${i.name} ${i.location ?? ''} ${i.note ?? ''}`.toLowerCase().includes(q)),
   )
 })
 
-const visibleCats = computed(() =>
-  cat.value === 'all' ? INV_CATS : INV_CATS.filter(c => c.id === cat.value),
+// Catégories visibles : celles qui ont des items aujourd'hui (réactif) + la catégorie actuellement sélectionnée si filtre actif.
+const visibleCategories = computed(() => {
+  const used = new Set(inventory.items.value.map(i => i.category))
+  if (cat.value !== 'all') used.add(cat.value)
+  return categories.items.value.filter(c => used.has(c['@id']))
+})
+
+const categoriesShownInList = computed(() =>
+  cat.value === 'all'
+    ? visibleCategories.value
+    : visibleCategories.value.filter(c => c['@id'] === cat.value),
 )
 
-function itemsOfCat(catId: InvCategoryId) {
-  return filtered.value.filter(i => i.cat === catId)
+function itemsOfCategory(iri: string) {
+  return filtered.value.filter(i => i.category === iri)
 }
 
-const STATE_FILTERS: Array<[StateFilter, string]> = [
-  ['all', 'Tous'],
-  ['ok', 'Bon'],
-  ['worn', 'Usé'],
-  ['replace', 'À remplacer'],
-]
+async function onPatch(
+  id: number,
+  patch: Partial<Pick<InventoryItem, 'state' | 'quantity'>>,
+) {
+  actionError.value = null
+  try {
+    await inventory.patch(id, patch)
+  } catch (err) {
+    actionError.value = formatError(err)
+  }
+}
 
-function onPatch(id: string, patch: Partial<Pick<InvItem, 'state' | 'qty'>>) {
-  items.value = items.value.map(i => (i.id === id ? { ...i, ...patch } : i))
+function onEdit(_item: InventoryItem) {
+  // TODO logique — modale d'édition (étape 4)
 }
 
 function onNew() {
-  // TODO logique — création d'article (mode guide)
+  // TODO logique — modale de création (étape 4)
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof AxiosError) {
+    if (err.response?.status === 403) return 'Action non autorisée.'
+    if (err.response?.status === 422) return 'Données invalides.'
+    if (err.code === 'ERR_NETWORK') return 'Impossible de joindre le serveur.'
+  }
+  return 'Une erreur est survenue.'
+}
+
+async function retryInitial() {
+  await Promise.all([inventory.fetchAll(), categories.fetchAll()])
 }
 </script>
 
@@ -78,90 +114,109 @@ function onNew() {
 
   <div class="content">
     <div class="content-inner view">
-      <section class="inv-summary" aria-label="Résumé de l'inventaire">
-        <div class="sumcard">
-          <span class="sum-k mono">ARTICLES</span>
-          <span class="sum-v num">{{ counts.total }}</span>
-          <span class="sum-s muted">{{ counts.refs }} références</span>
-        </div>
-        <div class="sumcard">
-          <span class="sum-k mono ok-key">BON ÉTAT</span>
-          <span class="sum-v num">{{ counts.ok }}</span>
-          <span class="sum-s muted">références</span>
-        </div>
-        <div class="sumcard">
-          <span class="sum-k mono worn-key">USÉ</span>
-          <span class="sum-v num">{{ counts.worn }}</span>
-          <span class="sum-s muted">à surveiller</span>
-        </div>
-        <div class="sumcard" :class="{ hot: counts.replace > 0 }">
-          <span class="sum-k mono replace-key">À REMPLACER</span>
-          <span class="sum-v num">{{ counts.replace }}</span>
-          <span class="sum-s muted">
-            {{ counts.replace > 0 ? 'action requise' : 'rien à signaler' }}
-          </span>
-        </div>
-      </section>
-
-      <div class="filt-bar">
-        <div class="chips" role="tablist" aria-label="Filtrer par catégorie">
-          <button
-            class="chip"
-            :class="{ on: cat === 'all' }"
-            role="tab"
-            :aria-selected="cat === 'all'"
-            @click="cat = 'all'"
-          >
-            Tout
-          </button>
-          <button
-            v-for="c in INV_CATS"
-            :key="c.id"
-            class="chip"
-            :class="{ on: cat === c.id }"
-            role="tab"
-            :aria-selected="cat === c.id"
-            @click="cat = c.id"
-          >
-            <Icon :name="c.icon" :size="14" />{{ c.label }}
-          </button>
-        </div>
-        <div class="seg push-right" aria-label="Filtrer par état">
-          <button
-            v-for="[value, label] in STATE_FILTERS"
-            :key="value"
-            :class="{ on: state === value }"
-            @click="state = value"
-          >
-            {{ label }}
-          </button>
-        </div>
+      <div v-if="initialState === 'loading'" class="card pad-center">
+        <p class="muted">Chargement…</p>
       </div>
 
-      <template v-for="c in visibleCats" :key="c.id">
-        <section v-if="itemsOfCat(c.id).length" class="inv-cat">
-          <header class="inv-cat-head">
-            <Icon :name="c.icon" :size="17" />
-            <h3>{{ c.label }}</h3>
-            <span class="mono muted cat-count">
-              {{ itemsOfCat(c.id).length }} réf.
+      <div v-else-if="initialState === 'error'" class="card pad-center">
+        <p class="error-msg">
+          {{ inventory.errorMessage.value ?? categories.errorMessage.value ?? 'Erreur de chargement.' }}
+        </p>
+        <button class="btn" @click="retryInitial">Réessayer</button>
+      </div>
+
+      <template v-else>
+        <section class="inv-summary" aria-label="Résumé de l'inventaire">
+          <div class="sumcard">
+            <span class="sum-k mono">ARTICLES</span>
+            <span class="sum-v num">{{ counts.total }}</span>
+            <span class="sum-s muted">{{ counts.refs }} références</span>
+          </div>
+          <div class="sumcard">
+            <span class="sum-k mono ok-key">BON ÉTAT</span>
+            <span class="sum-v num">{{ counts.ok }}</span>
+            <span class="sum-s muted">références</span>
+          </div>
+          <div class="sumcard">
+            <span class="sum-k mono worn-key">USÉ</span>
+            <span class="sum-v num">{{ counts.worn }}</span>
+            <span class="sum-s muted">à surveiller</span>
+          </div>
+          <div class="sumcard" :class="{ hot: counts.replace > 0 }">
+            <span class="sum-k mono replace-key">À REMPLACER</span>
+            <span class="sum-v num">{{ counts.replace }}</span>
+            <span class="sum-s muted">
+              {{ counts.replace > 0 ? 'action requise' : 'rien à signaler' }}
             </span>
-          </header>
-          <div class="inv-cat-body card">
-            <InvRow
-              v-for="it in itemsOfCat(c.id)"
-              :key="it.id"
-              :item="it"
-              @patch="onPatch"
-            />
           </div>
         </section>
-      </template>
 
-      <div v-if="!filtered.length" class="empty">
-        <Icon name="search" :size="26" class="muted-icon" />
-        <p>Aucun article ne correspond.</p>
-      </div>
+        <div v-if="actionError" class="action-error">
+          <Icon name="alert" :size="15" />
+          {{ actionError }}
+        </div>
+
+        <div class="filt-bar">
+          <div class="chips" role="tablist" aria-label="Filtrer par catégorie">
+            <button
+              class="chip"
+              :class="{ on: cat === 'all' }"
+              role="tab"
+              :aria-selected="cat === 'all'"
+              @click="cat = 'all'"
+            >
+              Tout
+            </button>
+            <button
+              v-for="c in visibleCategories"
+              :key="c['@id']"
+              class="chip"
+              :class="{ on: cat === c['@id'] }"
+              role="tab"
+              :aria-selected="cat === c['@id']"
+              @click="cat = c['@id']"
+            >
+              <Icon :name="c.icon" :size="14" />{{ c.name }}
+            </button>
+          </div>
+          <div class="seg push-right" aria-label="Filtrer par état">
+            <button
+              v-for="[value, label] in STATE_FILTERS"
+              :key="value"
+              :class="{ on: state === value }"
+              @click="state = value"
+            >
+              {{ label }}
+            </button>
+          </div>
+        </div>
+
+        <template v-for="c in categoriesShownInList" :key="c['@id']">
+          <section v-if="itemsOfCategory(c['@id']).length" class="inv-cat">
+            <header class="inv-cat-head">
+              <Icon :name="c.icon" :size="17" />
+              <h3>{{ c.name }}</h3>
+              <span class="mono muted cat-count">
+                {{ itemsOfCategory(c['@id']).length }} réf.
+              </span>
+            </header>
+            <div class="inv-cat-body card">
+              <InvRow
+                v-for="it in itemsOfCategory(c['@id'])"
+                :key="it.id"
+                :item="it"
+                @patch="onPatch"
+                @edit="onEdit"
+              />
+            </div>
+          </section>
+        </template>
+
+        <div v-if="!filtered.length" class="empty">
+          <Icon name="search" :size="26" class="muted-icon" />
+          <p>Aucun article ne correspond.</p>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -185,5 +240,25 @@ function onNew() {
 .cat-count {
   margin-left: auto;
   font-size: 11.5px;
+}
+.pad-center {
+  padding: 48px;
+  text-align: center;
+}
+.error-msg {
+  color: var(--replace);
+  margin-bottom: 16px;
+}
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--replace-bg);
+  color: #8c3a2e;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>
