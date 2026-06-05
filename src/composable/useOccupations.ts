@@ -1,5 +1,10 @@
 import {onMounted, ref} from "vue";
-import {type Occupation, type OccupationCreatePayload, occupationsApi} from "@/api/occupation.ts";
+import {
+    type Occupation,
+    type OccupationCreatePayload,
+    type OccupationUpdatePayload,
+    occupationsApi,
+} from "@/api/occupation.ts";
 import {AxiosError} from "axios";
 
 type AsyncState = 'idle' | 'loading' | 'error' | 'success'
@@ -29,6 +34,12 @@ export function useOccupations() {
         return data
     }
 
+    async function update(id: number, payload: OccupationUpdatePayload) {
+        const {data} = await occupationsApi.update(id, payload)
+        items.value = items.value.map(item => item.id === id ? data : item)
+        return data
+    }
+
     async function remove(id: number) {
         await occupationsApi.remove(id)
         items.value = items.value.filter(item => item.id != id)
@@ -42,6 +53,7 @@ export function useOccupations() {
         errorMessage,
         fetchAll,
         create,
+        update,
         remove,
     }
 }

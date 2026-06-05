@@ -18,5 +18,13 @@ export const ICONS: Record<string, string> = {
   check: `<path d="M5 12.5 10 17.5 19.5 7" ${P}/>`,
   x: `<path d="M6 6 18 18M18 6 6 18" ${P}/>`,
   user: `<circle cx="12" cy="8.5" r="3.5" ${P}/><path d="M5.5 19a6.5 6.5 0 0 1 13 0" ${P}/>`,
+  users: `<circle cx="9" cy="9" r="3.2" ${P}/><path d="M3 19a6 6 0 0 1 12 0" ${P}/><path d="M15 6.5a3 3 0 0 1 0 5.7M21 19a5 5 0 0 0-3.6-4.8" ${P}/>`,
   gear: `<circle cx="12" cy="12" r="3" ${P}/><path d="M12 3v2.5M12 18.5V21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M3 12h2.5M18.5 12H21M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" ${P}/>`,
+  trash: `<path d="M4.5 7h15M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7M6.5 7l1 12a2 2 0 0 0 2 1.8h5a2 2 0 0 0 2-1.8l1-12" ${P}/>`,
+  alert: `<path d="M12 4 2.5 20h19z" ${P}/><path d="M12 10v4M12 17h.01" ${P}/>`,
+  clock: `<circle cx="12" cy="12" r="8.5" ${P}/><path d="M12 7.5V12l3 2" ${P}/>`,
+  grid: `<rect x="3.5" y="3.5" width="7" height="7" rx="1.5" ${P}/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" ${P}/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" ${P}/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" ${P}/>`,
+  cols: `<rect x="3.5" y="4" width="5" height="16" rx="1.5" ${P}/><rect x="9.5" y="4" width="5" height="16" rx="1.5" ${P}/><rect x="15.5" y="4" width="5" height="16" rx="1.5" ${P}/>`,
+  list: `<path d="M4 6.5h16M4 12h16M4 17.5h16" ${P}/>`,
+  arrow: `<path d="M5 12h14M13 6l6 6-6 6" ${P}/>`,
 }

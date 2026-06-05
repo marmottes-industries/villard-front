@@ -4,4 +4,4 @@
 /design
 .env.local
 .env.*.local
-
+/dist
