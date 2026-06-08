@@ -1,19 +1,19 @@
 # Les Marmottes — API Reference
 
-Documentation de l'API backend (`villard-api`) à destination du client front (`appart-front`).
+Documentation de l'API backend (`villard-api`) à destination du client front (`villard-front`).
 Ce fichier est conçu pour être copié à la racine du repo front et lu directement par l'agent Claude du projet front.
 
-> **Stack backend**: Symfony 8.1 + API Platform 4.x + Doctrine + MariaDB + LexikJWT.
+> **Stack backend**: Symfony 8.1 + API Platform 4.x + Doctrine + MariaDB + LexikJWT + gesdinet/jwt-refresh-token-bundle.
 > **Préfixe global**: toutes les routes API sont sous `/api`.
 
 ---
 
 ## 1. Base URL & environnements
 
-| Env       | URL                        | Notes                            |
-|-----------|----------------------------|----------------------------------|
-| Dev local | `http://127.0.0.1:8000` | lancé via `symfony server:start` |
-| Prod      | _(à définir)_              |                                  |
+| Env       | URL                                    | Notes                            |
+|-----------|----------------------------------------|----------------------------------|
+| Dev local | `http://127.0.0.1:8000/api`            | lancé via `symfony server:start` |
+| Prod      | `https://villard-api.antoninpamart.fr` | herbergé infomaniak              |
 
 CORS dev : tout `http(s)://localhost` ou `127.0.0.1` sur n'importe quel port est autorisé. Méthodes autorisées :
 `GET, POST, PUT, PATCH, DELETE, OPTIONS`. Headers : `Content-Type`, `Authorization`.
@@ -22,9 +22,9 @@ Documentation interactive Swagger : `GET /api/docs` (accès public).
 
 ---
 
-## 2. Authentification (JWT)
+## 2. Authentification (JWT + refresh)
 
-L'API est **stateless**. Toutes les routes sous `/api` (sauf `/api/login` et `/api/docs`) exigent un JWT valide.
+L'API est **stateless**. Toutes les routes sous `/api` (sauf `/api/login`, `/api/token/refresh` et `/api/docs`) exigent un JWT valide.
 
 ### 2.1 Login
 
@@ -42,7 +42,8 @@ Content-Type: application/json
 
 ```json
 {
-  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...."
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9....",
+    "refresh_token": "7e1f741b392bcd1cf078276fa68327f0..."
 }
 ```
 
@@ -56,12 +57,41 @@ Joindre le token sur **toutes** les requêtes API :
 Authorization: Bearer <token>
 ```
 
-- **TTL** : 3600 s (1 h). Au-delà → `401`. Pas de refresh token côté serveur pour l'instant : refaire un
-  `POST /api/login`.
+- **TTL access token** : 3600 s (1 h). Au-delà → `401` (cf. §2.3 pour le refresh).
 - Le claim d'identité du JWT est `uuid` (UUID immuable de l'utilisateur) → renommer son `username` n'invalide pas un
   token déjà émis.
 
-### 2.3 Rôles
+### 2.3 Refresh token
+
+À expiration du JWT, échanger le `refresh_token` contre un nouveau couple :
+
+```
+POST /api/token/refresh
+Content-Type: application/json
+
+{ "refresh_token": "7e1f741b392bcd1cf078276fa68327f0..." }
+```
+
+**Réponse 200** — nouveau couple :
+
+```json
+{
+    "token": "eyJ0eXAi...",
+    "refresh_token": "9273a5b26cea54234b63e4c37128fc2c..."
+}
+```
+
+**Réponse 401** : refresh inconnu, expiré, ou déjà consommé.
+
+Côté serveur :
+
+- **TTL refresh token** : 30 jours, **glissant** — chaque refresh repart pour 30 jours d'activité.
+- **Rotation activée** (`single_use: true`) : un refresh token ne sert qu'**une seule fois**. Stocker uniquement le dernier `refresh_token` reçu et écraser à chaque refresh.
+- Un utilisateur inactif > 30 jours doit refaire un `POST /api/login`.
+
+> ⚠️ Stratégie front recommandée : intercepteur HTTP qui sur `401` (autre que sur `/api/login`) tente **un seul** appel à `/api/token/refresh`, rejoue la requête initiale avec le nouveau token, et si le refresh lui-même renvoie `401` → déconnexion + redirection vers le login. Verrouiller les refreshs concurrents (mutex/queue) pour éviter qu'une vague de 401 ne fasse appeler `/api/token/refresh` 10× en parallèle : seul le premier réussit, les autres invalideront le nouveau refresh (rotation).
+
+### 2.4 Rôles
 
 - `ROLE_USER` : utilisateur connecté (par défaut pour tout user).
 - `ROLE_ADMIN` : suppressions sensibles + création/suppression d'utilisateurs.
@@ -87,17 +117,17 @@ Les `GET` de collection (`/api/categories`, etc.) retournent par défaut un obje
 
 ```json
 {
-  "@context": "/api/contexts/Category",
-  "@id": "/api/categories",
-  "@type": "hydra:Collection",
-  "hydra:member": [
-    {
-      "@id": "/api/categories/1",
-      "id": 1,
-      "name": "Cuisine"
-    }
-  ],
-  "hydra:totalItems": 1
+    "@context": "/api/contexts/Category",
+    "@id": "/api/categories",
+    "@type": "hydra:Collection",
+    "hydra:member": [
+        {
+            "@id": "/api/categories/1",
+            "id": 1,
+            "name": "Cuisine"
+        }
+    ],
+    "hydra:totalItems": 1
 }
 ```
 
@@ -139,16 +169,20 @@ Authentification système. **Identifiant URL = `id` numérique.** L'`uuid` est i
 
 ```json
 {
-  "id": 1,
-  "username": "alice",
-  "roles": [
-    "ROLE_USER"
-  ]
+    "id": 1,
+    "username": "alice",
+    "roles": [
+        "ROLE_USER"
+    ]
 }
 ```
 
 **Écriture (`user:write`)** — seul `username` est exposé en write par les groupes de sérialisation. Le mot de passe
-n'est pas modifiable via cet endpoint (à terme : commande CLI `app:create-user`, cf. `CreateUserCommand`).
+n'est pas modifiable via cet endpoint.
+
+> ⚠️ **Conséquence** : `POST /api/users` ne peut pas définir de mot de passe → impossible de créer un compte utilisable
+> directement par l'API tant que `password` n'est pas ajouté au groupe `user:write`. Pour créer un user en pratique,
+> utiliser la commande CLI côté backend : `php bin/console app:create-user <username>` (cf. `CreateUserCommand`).
 
 ### 4.2 Category — `/api/categories`
 
@@ -158,8 +192,8 @@ n'est pas modifiable via cet endpoint (à terme : commande CLI `app:create-user`
 
 ```json
 {
-  "id": 1,
-  "name": "Cuisine"
+    "id": 1,
+    "name": "Cuisine"
 }
 ```
 
@@ -176,14 +210,22 @@ Inventaire de l'appartement. `category` est **obligatoire**.
 
 ```json
 {
-  "id": 12,
-  "name": "Casseroles",
-  "quantity": 3,
-  "category": "/api/categories/1"
+    "id": 12,
+    "name": "Casseroles",
+    "quantity": 3,
+    "category": "/api/categories/1",
+    "state": "ok",
+    "note": "Une casserole a perdu son manche",
+    "location": "Placard sous l'évier"
 }
 ```
 
-Pour `POST` / `PUT` : passer la category en IRI (`"/api/categories/1"`) — convention API Platform.
+Champs :
+
+- `category` (IRI, **requis**) — passer la catégorie en IRI (`"/api/categories/1"`), convention API Platform.
+- `state` (enum, défaut `"ok"`) — valeurs possibles : `"ok"` (Bon état), `"worn"` (Abimé), `"replace"` (À remplacer).
+- `note` (string, optionnel) — précision libre sur l'item (jusqu'à 255 caractères).
+- `location` (string, optionnel) — emplacement physique dans le logement (255 caractères).
 
 ### 4.4 ShoppingItem — `/api/shopping_items`
 
@@ -196,11 +238,11 @@ Liste de courses. `category` est **optionnelle**.
 
 ```json
 {
-  "id": 4,
-  "name": "Lait",
-  "quantity": 2,
-  "purchased": false,
-  "category": "/api/categories/1"
+    "id": 4,
+    "name": "Lait",
+    "quantity": 2,
+    "purchased": false,
+    "category": "/api/categories/1"
 }
 ```
 
@@ -214,16 +256,17 @@ Liste de courses. `category` est **optionnelle**.
 
 ```json
 {
-  "id": 7,
-  "title": "Code du portail",
-  "content": "1234B",
-  "createdAt": "2026-01-15T10:00:00+00:00",
-  "author": "/api/users/2"
+    "id": 7,
+    "title": "Code du portail",
+    "content": "1234B",
+    "createdAt": "2026-01-15T10:00:00+00:00",
+    "author": "/api/users/2"
 }
 ```
 
-> ⚠️ En `POST`, `author` doit pointer sur l'utilisateur courant (sauf admin). `createdAt` n'est pas auto-rempli pour l'
-> instant côté serveur → l'envoyer depuis le front.
+> En `POST`, `author` doit pointer sur l'utilisateur courant (sauf admin). **`createdAt` est auto-rempli côté serveur**
+> (timestamp UTC à l'instant de la création) et lecture seule — toute valeur envoyée par le client est ignorée, y
+> compris en `PUT`/`PATCH`.
 
 ### 4.6 Occupation — `/api/occupations`
 
@@ -237,11 +280,11 @@ Calendrier d'occupation de l'appartement.
 
 ```json
 {
-  "id": 3,
-  "startDate": "2026-07-01",
-  "endDate": "2026-07-15",
-  "notes": "Vacances d'été",
-  "occupant": "/api/users/2"
+    "id": 3,
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-15",
+    "notes": "Vacances d'été",
+    "occupant": "/api/users/2"
 }
 ```
 
@@ -275,11 +318,23 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 ### 5.2 Login
 
 ```ts
-const {token} = await api<{ token: string }>('/login', {
+const {token, refresh_token} = await api<{ token: string; refresh_token: string }>('/login', {
     method: 'POST',
     body: JSON.stringify({username, password}),
 })
 localStorage.setItem('jwt', token)
+localStorage.setItem('refresh', refresh_token)
+```
+
+### 5.2 bis Refresh
+
+```ts
+const {token, refresh_token} = await api<{ token: string; refresh_token: string }>('/token/refresh', {
+    method: 'POST',
+    body: JSON.stringify({refresh_token: localStorage.getItem('refresh')}),
+})
+localStorage.setItem('jwt', token)
+localStorage.setItem('refresh', refresh_token) // ⚠️ écraser : l'ancien refresh est invalidé
 ```
 
 ### 5.3 Lister les courses
@@ -321,7 +376,7 @@ await api('/occupations', {
 2. **PATCH** → `Content-Type: application/merge-patch+json` sinon `415`.
 3. Préférer `Accept: application/json` pour des payloads plats ; passer en `application/ld+json` uniquement si on a
    besoin de l'hypermedia/pagination Hydra.
-4. Le JWT expire au bout d'1 h : prévoir un intercepteur qui, sur `401`, déconnecte et redirige vers le login.
+4. Le JWT expire au bout d'1 h : intercepteur qui sur `401` tente un refresh (§2.3), rejoue la requête, et déconnecte uniquement si le refresh échoue lui-même.
 5. **Pas de breaking changes côté serveur** : si le front a besoin d'un champ supplémentaire ou d'un endpoint custom,
    ouvrir une issue plutôt que de bidouiller. L'API doit rester consommable par d'autres clients (mobile à venir).
 6. La pluralisation des URLs suit la convention API Platform : `Category → categories`,
@@ -330,11 +385,66 @@ await api('/occupations', {
 
 ---
 
-## 7. Endpoints non encore exposés
+## 7. Endpoint `/api/me`
+
+`GET /api/me` (sécurité `ROLE_USER`) retourne le profil de l'utilisateur courant, sérialisé avec le groupe `user:read`.
+L'IRI renvoyé pointe vers `/api/users/{id}`. Pas besoin de décoder le JWT côté front pour connaître l'identité du user
+connecté.
+
+```ts
+const me = await api<User>('/me')
+// → { id: 2, uuid: "...", username: "antonin", roles: ["ROLE_USER"] }
+```
+
+Implémenté via `App\State\MeProvider` (cf. `src/State/MeProvider.php`). Si l'utilisateur n'est pas authentifié → `401`.
+
+---
+
+## 8. Filtres, recherche & tri
+
+Toutes les collections (`GET /api/<resource>`) acceptent des paramètres de filtrage et de tri via la query string. Les paramètres se combinent en AND.
+
+### Stratégies courantes
+
+- **SearchFilter `exact`** : égalité stricte. Sur une relation, on accepte l'IRI (`?category=/api/categories/1`) **ou** l'id nu (`?category=1`).
+- **SearchFilter `ipartial`** : `LIKE %valeur%` insensible à la casse, pour les recherches en texte libre.
+- **DateFilter** : suffixes `[before]`, `[strictly_before]`, `[after]`, `[strictly_after]`. Exemple : `?createdAt[after]=2026-01-01`.
+- **BooleanFilter** : `true` / `false` (ou `1` / `0`).
+- **OrderFilter** : `?order[champ]=asc|desc`, plusieurs champs autorisés.
+
+### Récapitulatif par ressource
+
+| Ressource | Search | Date | Order | Booléen |
+|-----------|--------|------|-------|---------|
+| `Category` | `name` (ipartial) | — | `name` | — |
+| `InventoryItem` | `name` (ipartial), `category` (exact), `state` (exact), `note` (ipartial), `location` (ipartial) | — | `name`, `quantity`, `state` | — |
+| `ShoppingItem` | `name` (ipartial), `category` (exact) | — | `name`, `purchased` | `purchased` |
+| `Note` | `title` (ipartial), `content` (ipartial), `author` (exact), `author.uuid` (exact) | `createdAt` | `createdAt`, `title` | — |
+| `Occupation` | `occupant` (exact), `occupant.uuid` (exact), `notes` (ipartial) | `startDate`, `endDate` | `startDate`, `endDate` | — |
+
+### Exemples
+
+```http
+# Notes contenant "chauffage", auteur donné, du plus récent au plus ancien
+GET /api/notes?content=chauffage&author=/api/users/3&order[createdAt]=desc
+
+# Occupations chevauchant juillet 2026
+GET /api/occupations?startDate[before]=2026-07-31&endDate[after]=2026-07-01
+
+# Inventaire d'une catégorie, items à remplacer
+GET /api/inventory_items?category=/api/categories/2&state=replace
+
+# Courses restantes triées par nom
+GET /api/shopping_items?purchased=false&order[name]=asc
+```
+
+Les filtres apparaissent aussi dans `/api/docs` (Swagger UI) pour chaque collection.
+
+---
+
+## 9. Endpoints non encore exposés
 
 À demander au backend si besoin côté front :
 
-  `GET /api/users` + filtrer.
-- Refresh token.
-- Auto-remplissage de `createdAt` sur `Note` côté serveur.
-- Filtres / recherche (API Platform `SearchFilter`) sur les ressources.
+- **Création de mot de passe via `POST /api/users`** — actuellement le champ `password` n'est pas dans `user:write` (
+  cf. § 4.1).
