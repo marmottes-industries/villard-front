@@ -38,4 +38,5 @@ export const ICONS: Record<string, string> = {
   menu: `<path d="M4 6.5h16M4 12h16M4 17.5h16" ${P}/>`,
   mobile: `<rect x="6.5" y="2.5" width="11" height="19" rx="2.5" ${P}/><path d="M10.5 18.5h3" ${P}/>`,
   note: `<path d="M6 3.5h9L19 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1-1.5z" ${P}/><path d="M14.5 3.5V8h4.5M8.5 12.5h7M8.5 16h5" ${P}/>`,
+  hammer: `<path d="M14 6.5l3.5-3.5 3.5 3.5-3.5 3.5-1.5-1.5-7.5 7.5-2-2 7.5-7.5z" ${P}/><path d="M9.5 14.5 4 20l1.5 1.5L11 16" ${P}/>`,
 }

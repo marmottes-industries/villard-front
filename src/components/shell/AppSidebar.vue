@@ -32,6 +32,7 @@ const gestion: NavItem[] = [
   { to: '/inventaire', label: 'Inventaire', ico: 'box', badge: counts.invReplace, warn: true },
   { to: '/courses', label: 'Courses', ico: 'cart', badge: counts.toBuy, warn: true },
   { to: '/notes', label: 'Notes', ico: 'note' },
+  { to: '/travaux', label: 'Travaux', ico: 'hammer' },
 ]
 </script>
 
