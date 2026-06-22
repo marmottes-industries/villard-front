@@ -46,11 +46,13 @@ const counts = computed(() => ({
 
 const filtered = computed<InventoryItem[]>(() => {
   const q = query.value.trim().toLowerCase()
-  return inventory.items.value.filter(i =>
-    (cat.value === 'all' || i.category === cat.value) &&
-    (state.value === 'all' || i.state === state.value) &&
-    (q === '' || `${i.name} ${i.location ?? ''} ${i.note ?? ''}`.toLowerCase().includes(q)),
-  )
+  return inventory.items.value
+    .filter(i =>
+      (cat.value === 'all' || i.category === cat.value) &&
+      (state.value === 'all' || i.state === state.value) &&
+      (q === '' || `${i.name} ${i.location ?? ''} ${i.note ?? ''}`.toLowerCase().includes(q)),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
 })
 
 // Catégories visibles : celles qui ont des items aujourd'hui (réactif) + la catégorie actuellement sélectionnée si filtre actif.

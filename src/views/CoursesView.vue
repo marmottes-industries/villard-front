@@ -54,13 +54,15 @@ const counts = computed(() => {
 
 const filtered = computed<ShoppingItem[]>(() => {
   const q = query.value.trim().toLowerCase()
-  return shopping.items.value.filter(i =>
-    (cat.value === 'all' || i.category === cat.value) &&
-    (purchase.value === 'all'
-      || (purchase.value === 'todo' && !i.purchased)
-      || (purchase.value === 'done' && i.purchased)) &&
-    (q === '' || i.name.toLowerCase().includes(q)),
-  )
+  return shopping.items.value
+    .filter(i =>
+      (cat.value === 'all' || i.category === cat.value) &&
+      (purchase.value === 'all'
+        || (purchase.value === 'todo' && !i.purchased)
+        || (purchase.value === 'done' && i.purchased)) &&
+      (q === '' || i.name.toLowerCase().includes(q)),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
 })
 
 const visibleCategories = computed(() => {
