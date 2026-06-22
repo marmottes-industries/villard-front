@@ -68,6 +68,12 @@ const current = computed<Occupation | null>(() => {
   return null
 })
 
+// Stay preview in the modal uses the apartment's own forecast (Villard), not Côte 2000.
+const apartmentDaily = computed(() => {
+  const locs = weather.data.value?.locations ?? []
+  return (locs.find(l => l.key === 'villard') ?? locs[0])?.daily ?? []
+})
+
 const next = computed<Occupation | null>(() => {
   return [...occupations.items.value]
     .filter(o => parseISO(o.startDate) > TODAY)
@@ -199,9 +205,7 @@ const monthRangeLabel = computed(() => {
       <template v-else>
         <WeatherWidget
           :occupations="occupations.items.value"
-          :current="weather.data.value?.current ?? null"
-          :daily="weather.data.value?.daily ?? []"
-          :air-quality="weather.data.value?.airQuality ?? null"
+          :locations="weather.data.value?.locations ?? []"
           :state="weather.state.value"
           :error-message="weather.errorMessage.value"
           @retry="weather.fetch"
@@ -262,7 +266,7 @@ const monthRangeLabel = computed(() => {
   <OccupationModal
     :open="modalOpen"
     :initial="modalInitial"
-    :daily="weather.data.value?.daily ?? []"
+    :daily="apartmentDaily"
     :occupants="users.items.value"
     :current-user-iri="currentUserIri"
     :can-delete="modalInitial?.mode === 'edit' && canEditOrDelete(modalInitial.occupation)"

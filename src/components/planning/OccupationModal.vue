@@ -59,7 +59,7 @@ const stayForecast = computed<DailyForecast[]>(() => {
   const s = startDate.value
   const e = endDate.value
   if (!s || !e || e <= s) return []
-  return props.daily.filter(d => d.date >= s && d.date < e)
+  return props.daily.filter(d => d.date >= s && d.date <= e)
 })
 
 function dayShort(dateISO: string): string {
