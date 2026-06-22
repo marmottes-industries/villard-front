@@ -7,8 +7,10 @@ import MonthCalendar from '@/components/planning/MonthCalendar.vue'
 import ListCalendar from '@/components/planning/ListCalendar.vue'
 import OccupantsLegend from '@/components/planning/OccupantsLegend.vue'
 import OccupationModal, { type ModalInitial } from '@/components/planning/OccupationModal.vue'
+import WeatherWidget from '@/components/planning/WeatherWidget.vue'
 import { useOccupations } from '@/composable/useOccupations'
 import { useUsers } from '@/composable/useUsers'
+import { useWeather } from '@/composable/useWeather'
 import { useUi } from '@/composable/useUi'
 import { useAuthStore } from '@/stores/auth'
 import type { Occupation } from '@/api/occupation'
@@ -26,6 +28,7 @@ type CalView = 'month' | 'list'
 
 const occupations = useOccupations()
 const users = useUsers()
+const weather = useWeather()
 const auth = useAuthStore()
 const { isMobile } = useUi()
 
@@ -194,6 +197,16 @@ const monthRangeLabel = computed(() => {
       </div>
 
       <template v-else>
+        <WeatherWidget
+          :occupations="occupations.items.value"
+          :current="weather.data.value?.current ?? null"
+          :daily="weather.data.value?.daily ?? []"
+          :air-quality="weather.data.value?.airQuality ?? null"
+          :state="weather.state.value"
+          :error-message="weather.errorMessage.value"
+          @retry="weather.fetch"
+        />
+
         <div class="occ-status">
           <div class="status-card">
             <span
@@ -249,6 +262,7 @@ const monthRangeLabel = computed(() => {
   <OccupationModal
     :open="modalOpen"
     :initial="modalInitial"
+    :daily="weather.data.value?.daily ?? []"
     :occupants="users.items.value"
     :current-user-iri="currentUserIri"
     :can-delete="modalInitial?.mode === 'edit' && canEditOrDelete(modalInitial.occupation)"

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-import { dayDiff, parseISO } from '@/utils/dates'
+import { dayDiff, parseISO, DOW, dowMon } from '@/utils/dates'
+import { weatherMeta } from '@/utils/weatherMeta'
 import type { Occupation } from '@/api/occupation'
+import type { DailyForecast } from '@/api/weather'
 import type { DisplayUser } from '@/composable/useUsers'
 
 export type ModalInitial =
@@ -12,6 +14,7 @@ export type ModalInitial =
 const props = defineProps<{
   open: boolean
   initial: ModalInitial | null
+  daily: DailyForecast[]
   occupants: DisplayUser[]
   currentUserIri: string | null
   canDelete: boolean
@@ -49,6 +52,20 @@ const nightsCount = computed(() => {
 const selectedOccupant = computed(() =>
   props.occupants.find(o => o.iri === occupantIri.value) ?? null
 )
+
+// Forecast for the selected stay (nights: arrival inclusive, departure exclusive).
+// Empty when the dates fall outside Open-Meteo's horizon — the preview then hides.
+const stayForecast = computed<DailyForecast[]>(() => {
+  const s = startDate.value
+  const e = endDate.value
+  if (!s || !e || e <= s) return []
+  return props.daily.filter(d => d.date >= s && d.date < e)
+})
+
+function dayShort(dateISO: string): string {
+  const dt = parseISO(dateISO)
+  return `${DOW[dowMon(dt)]} ${dt.getDate()}`
+}
 
 // Le backend peut renvoyer un datetime ISO complet ; <input type="date"> exige 'YYYY-MM-DD'.
 function toDateInput(iso: string): string {
@@ -174,6 +191,17 @@ function onDelete() {
           </span>
         </div>
 
+        <div v-if="stayForecast.length" class="modal-weather">
+          <span class="mw-title">Météo prévue</span>
+          <div class="mw-days">
+            <div v-for="d in stayForecast" :key="d.date" class="mw-day">
+              <span class="mw-dow">{{ dayShort(d.date) }}</span>
+              <Icon :name="weatherMeta(d.weatherCode).icon" :size="18" />
+              <span class="mw-temp">{{ Math.round(d.tempMax) }}°</span>
+            </div>
+          </div>
+        </div>
+
         <div v-if="errorMessage" class="modal-err">
           <Icon name="alert" :size="15" />
           {{ errorMessage }}
@@ -217,6 +245,48 @@ function onDelete() {
 }
 .occ-opt-role {
   font-size: 11px;
+}
+.modal-weather {
+  margin-top: 4px;
+}
+.mw-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.mw-days {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.mw-day {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: var(--card-2, color-mix(in srgb, var(--sage) 10%, transparent));
+  color: var(--forest);
+  min-width: 56px;
+}
+.mw-dow {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+.mw-temp {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
 }
 .danger {
   color: var(--replace);
