@@ -8,6 +8,7 @@ export type ShoppingItem = {
     quantity: number
     purchased: boolean
     category: string
+    property: string // IRI '/api/properties/{id}'
 }
 
 export type ShoppingCreatePayload = {
@@ -15,13 +16,15 @@ export type ShoppingCreatePayload = {
     quantity: number
     purchased?: boolean
     category: string
+    property: string
 }
 
-export type ShoppingUpdatePayload = Partial<ShoppingCreatePayload>
+export type ShoppingUpdatePayload = Partial<Omit<ShoppingCreatePayload, 'property'>>
 
 export const shoppingApi = {
-    list() {
-        return apiClient.get<ShoppingItem[]>('/api/shopping_items')
+    // `property` restreint au logement actif (cf. API.md §2.5).
+    list(property: string) {
+        return apiClient.get<ShoppingItem[]>('/api/shopping_items', { params: { property } })
     },
     create(payload: ShoppingCreatePayload) {
         return apiClient.post<ShoppingItem>('/api/shopping_items', payload)

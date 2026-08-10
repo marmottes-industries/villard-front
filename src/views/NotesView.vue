@@ -8,11 +8,13 @@ import NoteModal, { type ModalInitial } from '@/components/notes/NoteModal.vue'
 import { useNotes } from '@/composable/useNotes'
 import { useUsers } from '@/composable/useUsers'
 import { useAuthStore } from '@/stores/auth'
+import { usePropertiesStore } from '@/stores/properties'
 import type { Note } from '@/api/notes'
 
 const notes = useNotes()
 const users = useUsers()
 const auth = useAuthStore()
+const properties = usePropertiesStore()
 
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
 const currentUserIri = computed(() => {
@@ -121,14 +123,21 @@ async function retryInitial() {
         aria-label="Rechercher dans les notes"
       />
     </div>
-    <button class="btn primary" @click="onNew">
+    <button class="btn primary" :disabled="!properties.hasProperties" @click="onNew">
       <Icon name="plus" :size="16" /><span class="btn-label">Ajouter</span>
     </button>
   </AppTopbar>
 
   <div class="content">
     <div class="content-inner view">
-      <div v-if="initialState === 'loading'" class="card pad-center">
+      <div v-if="!properties.hasProperties" class="card pad-center">
+        <p class="muted">
+          Aucun logement ne vous est rattaché. Demande à un gestionnaire de t'ajouter
+          à un logement pour voir les notes.
+        </p>
+      </div>
+
+      <div v-else-if="initialState === 'loading'" class="card pad-center">
         <p class="muted">Chargement…</p>
       </div>
 

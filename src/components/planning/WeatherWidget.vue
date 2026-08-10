@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { weatherMeta, aqiMeta } from '@/utils/weatherMeta'
 import { DOW, fmtISO, parseISO, dowMon, todayMidday } from '@/utils/dates'
 import type { Occupation } from '@/api/occupation'
-import type { LocationForecast } from '@/api/weather'
+import { MAIN_LOCATION_KEY, type LocationForecast } from '@/api/weather'
 
 type AsyncState = 'idle' | 'loading' | 'error' | 'success'
 
@@ -20,13 +20,21 @@ const emit = defineEmits<{ retry: [] }>()
 
 const todayISO = fmtISO(todayMidday())
 
-// Selected location ('villard' by default — the apartment). Falls back to the
-// first available location if 'villard' isn't present.
-const selectedKey = ref<string>('villard')
+// Selected point. Defaults to 'main' — the property itself — and falls back to the
+// first available point: a property without a secondary point returns a single entry.
+// Never key on a specific property; 'main' / 'secondary' are stable across properties.
+const selectedKey = ref<string>(MAIN_LOCATION_KEY)
 const location = computed<LocationForecast | null>(() => {
   if (!props.locations.length) return null
   return props.locations.find(l => l.key === selectedKey.value) ?? props.locations[0]
 })
+
+// Switching property changes the available points: go back to the main one.
+// Keyed on the point keys so a mere re-render doesn't reset the user's choice.
+watch(
+  () => props.locations.map(l => l.key).join(','),
+  () => { selectedKey.value = MAIN_LOCATION_KEY },
+)
 
 const current = computed(() => location.value?.current ?? null)
 const air = computed(() => aqiMeta(location.value?.airQuality.europeanAqi ?? null))

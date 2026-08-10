@@ -6,6 +6,7 @@ export interface Occupation {
     endDate: string; // ISO 'YYYY-MM-DD'
     notes?: string;
     occupant: string; // IRI '/api/users/{id}'
+    property: string; // IRI '/api/properties/{id}'
 }
 
 export interface OccupationCreatePayload {
@@ -13,6 +14,7 @@ export interface OccupationCreatePayload {
     endDate: string,
     notes?: string,
     occupant: string,
+    property: string,
 }
 
 export interface OccupationUpdatePayload {
@@ -23,8 +25,10 @@ export interface OccupationUpdatePayload {
 }
 
 export const occupationsApi = {
-    list() {
-        return apiClient.get<Occupation[]>('/api/occupations')
+    // `property` restreint au logement actif. Le serveur cloisonne de toute façon
+    // (cf. API.md §2.5) : sans le paramètre, on afficherait tous les logements mélangés.
+    list(property: string) {
+        return apiClient.get<Occupation[]>('/api/occupations', { params: { property } })
     },
     get(id: number) {
         return apiClient.get<Occupation>(`/api/occupations/${id}`)

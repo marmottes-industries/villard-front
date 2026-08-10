@@ -8,6 +8,7 @@ import ShoppingItemModal, { type ModalInitial } from '@/components/shopping/Shop
 import { useShopping } from '@/composable/useShopping'
 import { useCategories } from '@/composable/useCategories'
 import { useAuthStore } from '@/stores/auth'
+import { usePropertiesStore } from '@/stores/properties'
 import type { ShoppingItem } from '@/api/shopping'
 
 type CatFilter = 'all' | string
@@ -22,6 +23,7 @@ const PURCHASE_FILTERS: Array<[PurchaseFilter, string]> = [
 const shopping = useShopping()
 const categories = useCategories()
 const auth = useAuthStore()
+const properties = usePropertiesStore()
 
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
 
@@ -195,14 +197,21 @@ async function retryInitial() {
         aria-label="Rechercher dans la liste de courses"
       />
     </div>
-    <button class="btn primary" @click="onNew">
+    <button class="btn primary" :disabled="!properties.hasProperties" @click="onNew">
       <Icon name="plus" :size="16" /><span class="btn-label">Ajouter</span>
     </button>
   </AppTopbar>
 
   <div class="content">
     <div class="content-inner view">
-      <div v-if="initialState === 'loading'" class="card pad-center">
+      <div v-if="!properties.hasProperties" class="card pad-center">
+        <p class="muted">
+          Aucun logement ne vous est rattaché. Demande à un gestionnaire de t'ajouter
+          à un logement pour voir la liste de courses.
+        </p>
+      </div>
+
+      <div v-else-if="initialState === 'loading'" class="card pad-center">
         <p class="muted">Chargement…</p>
       </div>
 

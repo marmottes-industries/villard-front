@@ -1,4 +1,5 @@
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { formatError } from '@/utils/formatError'
 import {
     inventoryApi,
@@ -6,19 +7,32 @@ import {
     type InventoryCreatePayload,
     type InventoryUpdatePayload,
 } from '@/api/inventory'
+import { usePropertiesStore } from '@/stores/properties'
 
 type AsyncState = 'idle' | 'loading' | 'error' | 'success'
 
 export function useInventory() {
+    const properties = usePropertiesStore()
+    const { activePropertyIri } = storeToRefs(properties)
+
     const items = ref<InventoryItem[]>([])
     const state = ref<AsyncState>('idle')
     const errorMessage = ref<string | null>(null)
 
     async function fetchAll() {
+        const property = activePropertyIri.value
+        // Aucun logement actif : on ne lance aucun appel, la vue affiche l'état vide.
+        if (!property) {
+            items.value = []
+            state.value = 'idle'
+            errorMessage.value = null
+            return
+        }
+
         state.value = 'loading'
         errorMessage.value = null
         try {
-            const { data } = await inventoryApi.list()
+            const { data } = await inventoryApi.list(property)
             items.value = data
             state.value = 'success'
         } catch (err) {
@@ -27,8 +41,10 @@ export function useInventory() {
         }
     }
 
-    async function create(payload: InventoryCreatePayload) {
-        const { data } = await inventoryApi.create(payload)
+    async function create(payload: Omit<InventoryCreatePayload, 'property'>) {
+        const property = activePropertyIri.value
+        if (!property) throw new Error('Aucun logement actif.')
+        const { data } = await inventoryApi.create({ ...payload, property })
         items.value = [...items.value, data]
         return data
     }
@@ -60,7 +76,8 @@ export function useInventory() {
         items.value = items.value.filter(i => i.id !== id)
     }
 
-    onMounted(fetchAll)
+    // Recharge au montage puis à chaque bascule de logement, sans rechargement de page.
+    watch(activePropertyIri, fetchAll, { immediate: true })
 
     return { items, state, errorMessage, fetchAll, create, update, patch, remove }
 }

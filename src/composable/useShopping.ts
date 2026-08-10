@@ -1,23 +1,37 @@
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { formatError } from '@/utils/formatError'
 import {
     shoppingApi,
     type ShoppingCreatePayload,
     type ShoppingUpdatePayload, type ShoppingItem,
 } from '@/api/shopping'
+import { usePropertiesStore } from '@/stores/properties'
 
 type AsyncState = 'idle' | 'loading' | 'error' | 'success'
 
 export function useShopping() {
+    const properties = usePropertiesStore()
+    const { activePropertyIri } = storeToRefs(properties)
+
     const items = ref<ShoppingItem[]>([])
     const state = ref<AsyncState>('idle')
     const errorMessage = ref<string | null>(null)
 
     async function fetchAll() {
+        const property = activePropertyIri.value
+        // Aucun logement actif : on ne lance aucun appel, la vue affiche l'état vide.
+        if (!property) {
+            items.value = []
+            state.value = 'idle'
+            errorMessage.value = null
+            return
+        }
+
         state.value = 'loading'
         errorMessage.value = null
         try {
-            const { data } = await shoppingApi.list()
+            const { data } = await shoppingApi.list(property)
             items.value = data
             state.value = 'success'
         } catch (err) {
@@ -26,8 +40,10 @@ export function useShopping() {
         }
     }
 
-    async function create(payload: ShoppingCreatePayload) {
-        const { data } = await shoppingApi.create(payload)
+    async function create(payload: Omit<ShoppingCreatePayload, 'property'>) {
+        const property = activePropertyIri.value
+        if (!property) throw new Error('Aucun logement actif.')
+        const { data } = await shoppingApi.create({ ...payload, property })
         items.value = [...items.value, data]
         return data
     }
@@ -59,7 +75,8 @@ export function useShopping() {
         items.value = items.value.filter(i => i.id !== id)
     }
 
-    onMounted(fetchAll)
+    // Recharge au montage puis à chaque bascule de logement, sans rechargement de page.
+    watch(activePropertyIri, fetchAll, { immediate: true })
 
     return { items, state, errorMessage, fetchAll, create, update, patch, remove }
 }

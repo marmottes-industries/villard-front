@@ -46,8 +46,9 @@ function extractErrorMessage(err: unknown): string {
 <template>
   <div class="login-wrap">
     <form class="card login-card" @submit.prevent="onSubmit">
-      <div class="eyebrow" style="margin-bottom: 8px">Villard-de-Lans</div>
-      <h1 style="font-size: 26px; margin-bottom: 24px">Les Marmottes</h1>
+      <!-- Aucun logement n'est connu avant l'authentification : libellé générique. -->
+      <div class="eyebrow" style="margin-bottom: 8px">Gestion de logements</div>
+      <h1 style="font-size: 26px; margin-bottom: 24px">Connexion</h1>
 
       <div class="field">
         <label for="username">Identifiant</label>

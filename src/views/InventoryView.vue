@@ -8,6 +8,7 @@ import InventoryItemModal, { type ModalInitial } from '@/components/inventory/In
 import { useInventory } from '@/composable/useInventory'
 import { useCategories } from '@/composable/useCategories'
 import { useAuthStore } from '@/stores/auth'
+import { usePropertiesStore } from '@/stores/properties'
 import type { InventoryItem, InvState } from '@/api/inventory'
 import { STATE_FILTERS } from '@/utils/inventoryState'
 
@@ -17,6 +18,7 @@ type StateFilter = InvState | 'all'
 const inventory = useInventory()
 const categories = useCategories()
 const auth = useAuthStore()
+const properties = usePropertiesStore()
 
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
 
@@ -163,14 +165,21 @@ async function retryInitial() {
         aria-label="Rechercher dans l'inventaire"
       />
     </div>
-    <button class="btn primary" @click="onNew">
+    <button class="btn primary" :disabled="!properties.hasProperties" @click="onNew">
       <Icon name="plus" :size="16" /><span class="btn-label">Ajouter</span>
     </button>
   </AppTopbar>
 
   <div class="content">
     <div class="content-inner view">
-      <div v-if="initialState === 'loading'" class="card pad-center">
+      <div v-if="!properties.hasProperties" class="card pad-center">
+        <p class="muted">
+          Aucun logement ne vous est rattaché. Demande à un gestionnaire de t'ajouter
+          à un logement pour voir l'inventaire.
+        </p>
+      </div>
+
+      <div v-else-if="initialState === 'loading'" class="card pad-center">
         <p class="muted">Chargement…</p>
       </div>
 

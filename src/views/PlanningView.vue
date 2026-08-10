@@ -13,6 +13,8 @@ import { useUsers } from '@/composable/useUsers'
 import { useWeather } from '@/composable/useWeather'
 import { useUi } from '@/composable/useUi'
 import { useAuthStore } from '@/stores/auth'
+import { usePropertiesStore } from '@/stores/properties'
+import { mainLocation } from '@/api/weather'
 import type { Occupation } from '@/api/occupation'
 import {
   MONTHS,
@@ -30,6 +32,7 @@ const occupations = useOccupations()
 const users = useUsers()
 const weather = useWeather()
 const auth = useAuthStore()
+const properties = usePropertiesStore()
 const { isMobile } = useUi()
 
 const TODAY = todayMidday()
@@ -68,11 +71,9 @@ const current = computed<Occupation | null>(() => {
   return null
 })
 
-// Stay preview in the modal uses the apartment's own forecast (Villard), not Côte 2000.
-const apartmentDaily = computed(() => {
-  const locs = weather.data.value?.locations ?? []
-  return (locs.find(l => l.key === 'villard') ?? locs[0])?.daily ?? []
-})
+// Stay preview in the modal uses the property's own forecast ('main'), not the
+// optional altitude point. Falls back to the first point if 'main' is missing.
+const apartmentDaily = computed(() => mainLocation(weather.data.value?.locations ?? [])?.daily ?? [])
 
 const next = computed<Occupation | null>(() => {
   return [...occupations.items.value]
@@ -186,14 +187,21 @@ const monthRangeLabel = computed(() => {
         <Icon name="list" :size="14" />Liste
       </button>
     </div>
-    <button class="btn primary" @click="openNew()">
+    <button class="btn primary" :disabled="!properties.hasProperties" @click="openNew()">
       <Icon name="plus" :size="16" /><span class="btn-label">Réserver</span>
     </button>
   </AppTopbar>
 
   <div class="content">
     <div class="content-inner view">
-      <div v-if="occupations.state.value === 'loading'" class="card pad-center">
+      <div v-if="!properties.hasProperties" class="card pad-center">
+        <p class="muted">
+          Aucun logement ne vous est rattaché. Demande à un gestionnaire de t'ajouter
+          à un logement pour voir le planning.
+        </p>
+      </div>
+
+      <div v-else-if="occupations.state.value === 'loading'" class="card pad-center">
         <p class="muted">Chargement…</p>
       </div>
 
