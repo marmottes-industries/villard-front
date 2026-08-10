@@ -1,4 +1,5 @@
 import {apiClient} from "./client";
+import type {Membership} from "@/api/properties";
 
 export interface LoginPayload {
     username: string,
@@ -17,11 +18,14 @@ export interface RefreshResponse {
 // Note : /api/me renvoie actuellement `@id: "/api/me"` (l'URL de l'endpoint)
 // et n'expose pas le champ `id` numérique de l'utilisateur. On déduit l'IRI réel
 // via une recherche par `uuid` dans la liste /api/users (cf. composable/useUsers).
+// `memberships` porte les logements de l'utilisateur embarqués (cf. API.md §7) :
+// c'est la seule requête nécessaire pour amorcer le sélecteur de logement.
 export interface User {
     '@id': string,
     uuid: string,
     username: string,
-    roles: string[]
+    roles: string[],
+    memberships: Membership[]
 }
 
 export const authApi = {
