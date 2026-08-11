@@ -11,6 +11,7 @@ export type InventoryItem = {
     location: string | null
     note: string | null
     category: string // IRI category
+    property: string // IRI '/api/properties/{id}'
 }
 
 export type InventoryCreatePayload = {
@@ -20,13 +21,15 @@ export type InventoryCreatePayload = {
     location?: string | null
     note?: string | null
     category: string
+    property: string
 }
 
-export type InventoryUpdatePayload = Partial<InventoryCreatePayload>
+export type InventoryUpdatePayload = Partial<Omit<InventoryCreatePayload, 'property'>>
 
 export const inventoryApi = {
-    list() {
-        return apiClient.get<InventoryItem[]>('/api/inventory_items')
+    // `property` restreint au logement actif (cf. API.md §2.5).
+    list(property: string) {
+        return apiClient.get<InventoryItem[]>('/api/inventory_items', { params: { property } })
     },
     create(payload: InventoryCreatePayload) {
         return apiClient.post<InventoryItem>('/api/inventory_items', payload)

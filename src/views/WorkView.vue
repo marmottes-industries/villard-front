@@ -11,6 +11,7 @@ import WorkModal, {
 import { useWork } from '@/composable/useWork'
 import { useUsers } from '@/composable/useUsers'
 import { useAuthStore } from '@/stores/auth'
+import { usePropertiesStore } from '@/stores/properties'
 import type { Work, WorkStatus } from '@/api/work'
 import {
   PRIORITY_ORDER,
@@ -21,6 +22,7 @@ import {
 const works = useWork()
 const users = useUsers()
 const auth = useAuthStore()
+const properties = usePropertiesStore()
 
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
 const currentUserIri = computed(() => {
@@ -207,14 +209,21 @@ async function retryInitial() {
         aria-label="Rechercher dans les travaux"
       />
     </div>
-    <button class="btn primary" @click="onNew">
+    <button class="btn primary" :disabled="!properties.hasProperties" @click="onNew">
       <Icon name="plus" :size="16" /><span class="btn-label">Ajouter</span>
     </button>
   </AppTopbar>
 
   <div class="content">
     <div class="content-inner view">
-      <div v-if="initialState === 'loading'" class="card pad-center">
+      <div v-if="!properties.hasProperties" class="card pad-center">
+        <p class="muted">
+          Aucun logement ne vous est rattaché. Demande à un gestionnaire de t'ajouter
+          à un logement pour voir les travaux.
+        </p>
+      </div>
+
+      <div v-else-if="initialState === 'loading'" class="card pad-center">
         <p class="muted">Chargement…</p>
       </div>
 
@@ -400,8 +409,8 @@ async function retryInitial() {
 }
 .filter-chip:hover { border-color: var(--line-3); }
 .filter-chip.on {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 .filter-count {

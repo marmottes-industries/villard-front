@@ -145,10 +145,10 @@ function onClick() {
   transition: border-color 0.14s, box-shadow 0.14s;
   text-align: left;
 }
-.work-card.status-progress { border-left-color: var(--accent, #4a8c5a); }
+.work-card.status-progress { border-left-color: var(--accent); }
 .work-card.status-planned { border-left-color: #6a8aa8; }
 .work-card.status-idea { border-left-color: var(--line-3); }
-.work-card.status-done { border-left-color: #8aab87; opacity: 0.85; }
+.work-card.status-done { border-left-color: var(--sage-2); opacity: 0.85; }
 .work-card.status-cancelled { border-left-color: #b5b1aa; opacity: 0.7; }
 
 .work-card.clickable { cursor: pointer; }
@@ -231,13 +231,13 @@ function onClick() {
 }
 .tag.tone-idea { color: #7a766e; background: #efece6; }
 .tag.tone-planned { color: #3d6184; background: #e3edf5; }
-.tag.tone-progress { color: #4a8c5a; background: #e4f0e6; }
-.tag.tone-done { color: #5b7a58; background: #e7ede4; }
+.tag.tone-progress { color: var(--accent-deep); background: var(--accent-bg); }
+.tag.tone-done { color: var(--ok); background: var(--ok-bg); }
 .tag.tone-cancelled { color: #8a847d; background: #ede9e3; }
 
-.tag.prio-low { color: #5b7a58; background: #e7ede4; }
-.tag.prio-medium { color: #876a2f; background: #f3ead7; }
-.tag.prio-high { color: #8c3a2e; background: #f5dfd9; }
+.tag.prio-low { color: var(--ok); background: var(--ok-bg); }
+.tag.prio-medium { color: var(--wood-deep); background: var(--worn-bg); }
+.tag.prio-high { color: #8c3a2e; background: var(--replace-bg); }
 
 .tag.tag-type {
   background: #ecece8;

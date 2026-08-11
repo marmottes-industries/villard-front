@@ -8,18 +8,22 @@ export type Note = {
     content: string
     createdAt: string
     author: string
+    property: string // IRI '/api/properties/{id}'
 }
 
+// `author` est renseigné côté serveur : inutile de l'envoyer.
 export type NoteCreatePayload = {
     title: string
     content: string
+    property: string
 }
 
-export type NoteUpdatePayload = Partial<NoteCreatePayload>
+export type NoteUpdatePayload = Partial<Omit<NoteCreatePayload, 'property'>>
 
 export const notesApi = {
-    list() {
-        return apiClient.get<Note[]>('/api/notes')
+    // `property` restreint au logement actif (cf. API.md §2.5).
+    list(property: string) {
+        return apiClient.get<Note[]>('/api/notes', { params: { property } })
     },
     create(payload: NoteCreatePayload) {
         return apiClient.post<Note>('/api/notes', payload)

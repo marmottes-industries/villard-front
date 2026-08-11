@@ -19,8 +19,10 @@ export type Work = {
     completedAt: string | null
     estimatedCost: number | null
     actualCost: number | null
+    property: string // IRI '/api/properties/{id}'
 }
 
+// `author` est renseigné côté serveur : inutile de l'envoyer.
 export type WorkCreatePayload = {
     title: string
     description?: string | null
@@ -30,13 +32,15 @@ export type WorkCreatePayload = {
     scheduledFor?: string | null
     estimatedCost?: number | null
     actualCost?: number | null
+    property: string
 }
 
-export type WorkUpdatePayload = Partial<WorkCreatePayload>
+export type WorkUpdatePayload = Partial<Omit<WorkCreatePayload, 'property'>>
 
 export const worksApi = {
-    list() {
-        return apiClient.get<Work[]>('/api/works')
+    // `property` restreint au logement actif (cf. API.md §2.5).
+    list(property: string) {
+        return apiClient.get<Work[]>('/api/works', { params: { property } })
     },
     create(payload: WorkCreatePayload) {
         return apiClient.post<Work>('/api/works', payload)

@@ -54,8 +54,8 @@ const principles: Principle[] = [
   <div class="content">
     <div class="content-inner view">
       <p class="arc-lede">
-        <b>Les Marmottes</b> est une application personnelle <b>découplée</b>
-        qui gère l'occupation et l'inventaire d'un appartement familial. Construite
+        Cette application personnelle <b>découplée</b> gère l'occupation et
+        l'inventaire d'un ou plusieurs logements familiaux. Construite
         comme une démonstration d'architecture moderne : un front Vue 3 statique, une
         API Symfony stateless, une base relationnelle classique — et zéro dépendance à
         un service tiers.

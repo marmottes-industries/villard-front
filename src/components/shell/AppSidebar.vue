@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
+import PropertySwitcher from '@/components/shell/PropertySwitcher.vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUi } from '@/composable/useUi'
@@ -40,13 +41,7 @@ const gestion: NavItem[] = [
   <aside class="sidebar" :class="{ open: sidebarOpen }" aria-label="Navigation principale">
     <div class="brand">
       <div class="brand-mark">
-        <div class="brand-glyph" style="color: #a9c9a0">
-          <Icon name="leaf" :size="20" />
-        </div>
-        <div class="brand-titles">
-          <div class="brand-name">Les Marmottes</div>
-          <div class="brand-sub">Villard-de-Lans</div>
-        </div>
+        <PropertySwitcher />
         <button
           type="button"
           class="brand-close"
@@ -77,6 +72,12 @@ const gestion: NavItem[] = [
       </RouterLink>
 
       <div class="nav-label">Projet</div>
+      <RouterLink v-slot="{ navigate, isActive }" to="/logements" custom>
+        <button class="nav-item" :class="{ active: isActive }" @click="navigate">
+          <Icon name="pin" :size="18" class="nav-ico" />
+          <span>Logements</span>
+        </button>
+      </RouterLink>
       <RouterLink v-slot="{ navigate, isActive }" to="/architecture" custom>
         <button class="nav-item" :class="{ active: isActive }" @click="navigate">
           <Icon name="server" :size="18" class="nav-ico" />
@@ -107,10 +108,6 @@ const gestion: NavItem[] = [
 </template>
 
 <style scoped>
-.brand-titles {
-  flex: 1;
-  min-width: 0;
-}
 .brand-close {
   display: none;
   border: 0;

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Per-property accent colour, picked from a closed palette in the property modal. The whole UI is tinted with the active
+  property's accent and follows every switch — **including the sidebar gradient**, its active-item marker, the property
+  switcher menu and the weather widget. The property switcher and the property cards carry a matching dot.
+- Two derived tokens, `--accent-ink` (dark surfaces) and `--accent-soft` (elements sitting on top of them), so the
+  sidebar can be tinted without losing contrast.
+- The weather widget's location segment and today's cell, and the « En cours » work pill, follow the accent too.
+  The other work statuses and the priorities keep their semantic colour code and now read it from the shared
+  `--ok` / `--worn` / `--replace` tokens instead of raw hexadecimals.
+
+### Changed
+
+- The accent is no longer a local user preference: it is read from `Property.accentHex` and dropped from the `tweaks`
+  store, which now only keeps density, calendar view and grain.
+- Page title is now just « Les Marmottes » — it is the name of the service, not of the Villard-de-Lans flat.
+
 ## [1.3.0] - 2026-06-22
 
 ### Added

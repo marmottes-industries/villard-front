@@ -6,7 +6,7 @@ const routes: RouteRecordRaw[] = [
         path: '/',
         redirect: () => {
             const last = localStorage.getItem('marmotte.route')
-            const known = ['planning', 'inventaire', 'courses', 'notes', 'travaux', 'architecture']
+            const known = ['planning', 'inventaire', 'courses', 'notes', 'travaux', 'logements', 'architecture']
             return last && known.includes(last) ? `/${last}` : '/planning'
         },
     },
@@ -44,6 +44,12 @@ const routes: RouteRecordRaw[] = [
         path: '/travaux',
         name: 'travaux',
         component: () => import('@/views/WorkView.vue'),
+        meta: {requireAuth: true}
+    },
+    {
+        path: '/logements',
+        name: 'logements',
+        component: () => import('@/views/PropertiesView.vue'),
         meta: {requireAuth: true}
     },
     {
