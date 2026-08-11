@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-import type { Property, PropertyCreatePayload } from '@/api/properties'
+import { ACCENTS, DEFAULT_ACCENT } from '@/config/accents'
+import type { AccentColor, Property, PropertyCreatePayload } from '@/api/properties'
 
 export type ModalInitial =
   | { mode: 'create' }
@@ -32,6 +33,7 @@ const timezone = ref('Europe/Paris')
 const secondaryName = ref('')
 const secondaryLatitude = ref('')
 const secondaryLongitude = ref('')
+const accentColor = ref<AccentColor>(DEFAULT_ACCENT)
 const archived = ref(false)
 
 const errorMessage = ref<string | null>(null)
@@ -76,6 +78,7 @@ watch(() => props.open, (open) => {
     secondaryName.value = p.secondaryLocationName ?? ''
     secondaryLatitude.value = p.secondaryLatitude != null ? String(p.secondaryLatitude) : ''
     secondaryLongitude.value = p.secondaryLongitude != null ? String(p.secondaryLongitude) : ''
+    accentColor.value = p.accentColor
     archived.value = p.archived
   } else {
     name.value = ''
@@ -88,6 +91,7 @@ watch(() => props.open, (open) => {
     secondaryName.value = ''
     secondaryLatitude.value = ''
     secondaryLongitude.value = ''
+    accentColor.value = DEFAULT_ACCENT
     archived.value = false
   }
 }, { immediate: true })
@@ -105,7 +109,7 @@ function onSave() {
     return
   }
   if (!SLUG_PATTERN.test(slug.value.trim())) {
-    errorMessage.value = 'Le slug doit être en minuscules, chiffres et tirets (ex. « les-marmottes »).'
+    errorMessage.value = 'Le slug doit être en minuscules, chiffres et tirets (ex. « les-tennis »).'
     return
   }
   if (!city.value.trim()) {
@@ -144,6 +148,7 @@ function onSave() {
       secondaryLocationName: secName || null,
       secondaryLatitude: secLat,
       secondaryLongitude: secLon,
+      accentColor: accentColor.value,
       archived: archived.value,
     },
   })
@@ -199,6 +204,28 @@ function onDelete() {
 
         <label class="fld-label" for="prop-address">Adresse (optionnel)</label>
         <input id="prop-address" v-model="address" class="fld" maxlength="255" autocomplete="off" />
+
+        <div class="fld-sec">
+          Couleur d'accent
+          <span class="muted">— teinte l'interface quand ce logement est actif</span>
+        </div>
+        <div class="accent-picker" role="radiogroup" aria-label="Couleur d'accent">
+          <button
+            v-for="a in ACCENTS"
+            :key="a.value"
+            type="button"
+            class="accent-swatch"
+            :class="{ on: a.value === accentColor }"
+            :style="{ '--swatch': a.hex }"
+            role="radio"
+            :aria-checked="a.value === accentColor"
+            :title="a.label"
+            @click="accentColor = a.value"
+          >
+            <Icon v-if="a.value === accentColor" name="check" :size="15" />
+            <span class="sr-only">{{ a.label }}</span>
+          </button>
+        </div>
 
         <div class="fld-sec">Point météo du logement</div>
         <div class="fld-grid">
@@ -279,6 +306,44 @@ function onDelete() {
 }
 .prop-archived input {
   margin-top: 2px;
+}
+
+.accent-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 2px;
+}
+.accent-swatch {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  border: 1px solid rgba(27, 39, 31, 0.14);
+  background: var(--swatch);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.1s, box-shadow 0.14s;
+}
+.accent-swatch:hover {
+  transform: translateY(-1px);
+}
+/* L'anneau reprend la teinte de la pastille : la sélection reste lisible
+   même quand l'accent de l'application est celui d'un autre logement. */
+.accent-swatch.on {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--swatch);
+}
+.accent-swatch:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 .danger {
   color: var(--replace);

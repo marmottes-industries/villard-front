@@ -1,5 +1,5 @@
 /* ============================================================
-   Les Mélèzes — gestion d'appartement
+   Les Marmottes — gestion de logements
    Design tokens + base. Forêt Vercors : crème, sapin, bois, sauge.
    ============================================================ */
 
@@ -40,10 +40,14 @@
   --wood-deep:#8A5A30;
   --wood-bg:  #EFE3D2;
 
-  /* accent — driven by tweak (defaults to forest) */
+  /* accent — driven by the active property (defaults to forest).
+     `-ink` habille les surfaces sombres (sidebar, menus posés dessus),
+     `-soft` les éléments qui doivent ressortir SUR ces surfaces sombres. */
   --accent:      var(--forest);
   --accent-2:    var(--forest-2);
   --accent-deep: var(--forest-deep);
+  --accent-ink:  var(--forest-ink);
+  --accent-soft: var(--sage-2);
   --accent-bg:   var(--sage-bg);
 
   /* foyer / personne colours (occupancy) */
@@ -127,7 +131,7 @@ button { font-family: inherit; }
 /* ---- Sidebar ---- */
 .sidebar {
   width: 246px; flex-shrink: 0; height: 100%;
-  background: linear-gradient(180deg, var(--forest-deep), var(--forest-ink));
+  background: linear-gradient(180deg, var(--accent-deep), var(--accent-ink));
   color: #E8EFE6; display: flex; flex-direction: column;
   position: relative;
 }
@@ -167,7 +171,7 @@ button { font-family: inherit; }
 .nav-item.active { background: rgba(255,255,255,.10); color: #fff; }
 .nav-item.active::before {
   content: ""; position: absolute; left: -14px; top: 8px; bottom: 8px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--wood-2);
+  border-radius: 0 3px 3px 0; background: var(--accent-soft);
 }
 .nav-ico { width: 18px; height: 18px; flex-shrink: 0; opacity: .9; }
 .nav-item .badge {

@@ -409,8 +409,8 @@ async function retryInitial() {
 }
 .filter-chip:hover { border-color: var(--line-3); }
 .filter-chip.on {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 .filter-count {

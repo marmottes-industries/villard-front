@@ -2,6 +2,11 @@ import { apiClient } from '@/api/client'
 
 export type PropertyRole = 'manager' | 'occupant'
 
+// Palette fermée côté API (cf. API.md §4.9). L'hexadécimal correspondant est
+// renvoyé par le serveur dans `accentHex` : les libellés et l'ordre du sélecteur
+// vivent dans `@/config/accents`.
+export type AccentColor = 'forest' | 'lake' | 'wood' | 'slate' | 'plum' | 'lichen'
+
 // Version allégée renvoyée embarquée par /api/me (groupe `property:summary`).
 // Suffisante pour amorcer le sélecteur de logement sans second appel.
 export type PropertySummary = {
@@ -13,6 +18,9 @@ export type PropertySummary = {
     latitude: number
     longitude: number
     timezone: string
+    accentColor: AccentColor
+    // Dérivé de `accentColor` côté serveur, en lecture seule.
+    accentHex: string
     archived: boolean
 }
 
@@ -43,6 +51,7 @@ export type PropertyCreatePayload = {
     secondaryLocationName?: string | null
     secondaryLatitude?: number | null
     secondaryLongitude?: number | null
+    accentColor?: AccentColor
     archived?: boolean
 }
 

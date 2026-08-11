@@ -322,9 +322,9 @@ function togglePriority(value: WorkPriority) {
   flex: 1 1 auto;
   justify-content: center;
 }
-.chip.prio-low.on { background: #e7ede4; color: #5b7a58; }
-.chip.prio-medium.on { background: #f3ead7; color: #876a2f; }
-.chip.prio-high.on { background: #f5dfd9; color: #8c3a2e; }
+.chip.prio-low.on { background: var(--ok-bg); color: var(--ok); }
+.chip.prio-medium.on { background: var(--worn-bg); color: var(--wood-deep); }
+.chip.prio-high.on { background: var(--replace-bg); color: #8c3a2e; }
 .optional { font-weight: 400; }
 .danger {
   color: var(--replace);

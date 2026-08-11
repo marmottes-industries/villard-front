@@ -273,7 +273,7 @@ function onDelete() {
   padding: 7px 9px;
   border-radius: 9px;
   background: var(--card-2, color-mix(in srgb, var(--sage) 10%, transparent));
-  color: var(--forest);
+  color: var(--accent);
   min-width: 56px;
 }
 .mw-dow {

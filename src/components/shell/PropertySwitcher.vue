@@ -49,7 +49,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 <template>
   <!-- Mono-logement (ou aucun) : pas de sélecteur, juste le nom du logement. -->
   <div v-if="!isMultiProperty" class="switcher static">
-    <div class="brand-glyph" style="color: #a9c9a0">
+    <div class="brand-glyph accent-glyph">
       <Icon name="leaf" :size="20" />
     </div>
     <div class="brand-titles">
@@ -66,7 +66,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
       aria-haspopup="listbox"
       @click="toggle"
     >
-      <div class="brand-glyph" style="color: #a9c9a0">
+      <div class="brand-glyph accent-glyph">
         <Icon name="leaf" :size="20" />
       </div>
       <div class="brand-titles">
@@ -87,6 +87,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
         :aria-selected="p.id === activeProperty?.id"
         @click="pick(p.id)"
       >
+        <span class="switcher-opt-dot" :style="{ background: p.accentHex }" aria-hidden="true" />
         <div class="switcher-opt-text">
           <span class="switcher-opt-name">{{ p.name }}</span>
           <span class="switcher-opt-city">{{ p.city }}</span>
@@ -124,6 +125,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Éclairci : la teinte brute du logement disparaîtrait sur le fond de sidebar,
+   qui est cette même teinte assombrie. */
+.accent-glyph {
+  color: var(--accent-soft);
 }
 
 .switcher-btn {
@@ -163,7 +169,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--forest-ink, #16221a);
+  background: var(--accent-ink, #16221a);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 11px;
   box-shadow: 0 16px 32px rgba(10, 18, 12, 0.45);
@@ -195,6 +201,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 .switcher-opt.on {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
+}
+/* Le liseré clair détache les accents sombres du fond de menu, lui-même sombre. */
+.switcher-opt-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 .switcher-opt-text {
   display: flex;

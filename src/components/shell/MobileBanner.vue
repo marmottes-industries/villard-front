@@ -31,7 +31,7 @@ const { dismissBanner } = useUi()
   align-items: center;
   gap: 11px;
   padding: 9px 12px;
-  background: linear-gradient(180deg, var(--forest-deep), var(--forest-ink));
+  background: linear-gradient(180deg, var(--accent-deep), var(--accent-ink));
   color: #e8efe6;
   font-size: 12.5px;
   line-height: 1.35;
@@ -47,7 +47,7 @@ const { dismissBanner } = useUi()
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  color: var(--wood-2);
+  color: var(--accent-soft);
 }
 .m-banner-text {
   display: flex;

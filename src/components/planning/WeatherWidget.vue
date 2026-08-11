@@ -173,7 +173,7 @@ const days = computed<DayView[]>(() => {
   gap: 4px;
   padding: 3px;
   margin-bottom: 14px;
-  background: color-mix(in srgb, var(--sage) 12%, transparent);
+  background: var(--accent-bg);
   border-radius: 10px;
 }
 .loc-seg button {
@@ -191,7 +191,7 @@ const days = computed<DayView[]>(() => {
 }
 .loc-seg button.on {
   background: var(--surface, #fff);
-  color: var(--forest);
+  color: var(--accent);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .loc-elev {
@@ -213,7 +213,7 @@ const days = computed<DayView[]>(() => {
   gap: 14px;
 }
 .now-icon {
-  color: var(--forest);
+  color: var(--accent);
 }
 .now-temp {
   display: flex;
@@ -295,10 +295,10 @@ const days = computed<DayView[]>(() => {
   scroll-snap-align: start;
 }
 .day.today {
-  background: var(--sage-bg, color-mix(in srgb, var(--sage) 18%, transparent));
+  background: var(--accent-bg);
 }
 .day.stay {
-  outline: 2px solid var(--forest);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .day-dow {
@@ -309,7 +309,7 @@ const days = computed<DayView[]>(() => {
   color: var(--ink-3);
 }
 .day-icon {
-  color: var(--forest);
+  color: var(--accent);
 }
 .day-temps {
   font-size: 12px;

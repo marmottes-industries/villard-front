@@ -148,6 +148,7 @@ onMounted(fetchAll)
             :class="{ archived: p.archived }"
           >
             <div class="prop-head">
+              <span class="prop-accent" :style="{ background: p.accentHex }" aria-hidden="true" />
               <div class="prop-titles">
                 <h3>{{ p.name }}</h3>
                 <div class="eyebrow">{{ p.city }}</div>
@@ -260,6 +261,20 @@ onMounted(fetchAll)
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+.prop-accent {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(27, 39, 31, 0.12);
+}
+/* `flex: 1` plutôt que le seul `space-between` du parent : sans lui, la pastille
+   d'accent se retrouverait décollée du titre dès qu'aucune étiquette n'est là. */
+.prop-titles {
+  flex: 1;
+  min-width: 0;
 }
 .prop-titles h3 {
   font-size: 18px;
