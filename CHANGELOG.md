@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-11
+
 ### Added
 
 - Per-property accent colour, picked from a closed palette in the property modal. The whole UI is tinted with the active
@@ -70,11 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial release.
-[unreleased]: https://github.com/marmottes-industries/villard-front/compare/v1.3.0...main
-[1.3.0]: https://github.com/marmottes-industries/villard-front/compare/v1.3.0...v1.2.0
-[1.2.0]: https://github.com/marmottes-industries/villard-front/compare/v1.2.0...v1.1.3
-[1.1.3]: https://github.com/marmottes-industries/villard-front/compare/v1.1.3...v1.1.2
-[1.1.2]: https://github.com/marmottes-industries/villard-front/compare/v1.1.2...1.1.1
-[1.1.1]: https://github.com/marmottes-industries/villard-front/compare/1.1.1...1.1.0
-[1.1.0]: https://github.com/marmottes-industries/villard-front/compare/1.1.0...1.0.0
-[1.0.0]: https://github.com/marmottes-industries/villard-front/compare/main...1.0.0
+  [unreleased]: https://github.com/marmottes-industries/villard-front/compare/v1.4.0...main
+  [1.4.0]: https://github.com/marmottes-industries/villard-front/compare/v1.4.0...v1.3.0
+  [1.3.0]: https://github.com/marmottes-industries/villard-front/compare/v1.3.0...v1.2.0
+  [1.2.0]: https://github.com/marmottes-industries/villard-front/compare/v1.2.0...v1.1.3
+  [1.1.3]: https://github.com/marmottes-industries/villard-front/compare/v1.1.3...v1.1.2
+  [1.1.2]: https://github.com/marmottes-industries/villard-front/compare/v1.1.2...1.1.1
+  [1.1.1]: https://github.com/marmottes-industries/villard-front/compare/1.1.1...1.1.0
+  [1.1.0]: https://github.com/marmottes-industries/villard-front/compare/1.1.0...1.0.0
+  [1.0.0]: https://github.com/marmottes-industries/villard-front/compare/main...1.0.0
