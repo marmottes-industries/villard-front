@@ -15,6 +15,7 @@ import {
   TYPE_META,
   TYPE_OPTIONS,
 } from '@/utils/workMeta'
+import type { DisplayRoom } from '@/composable/useRooms'
 
 export type ModalInitial =
   | { mode: 'create' }
@@ -30,11 +31,13 @@ export type WorkSavePayload = {
   scheduledFor: string | null
   estimatedCost: number | null
   actualCost: number | null
+  room: string | null
 }
 
 const props = defineProps<{
   open: boolean
   initial: ModalInitial | null
+  rooms: DisplayRoom[]
   canDelete: boolean
   saveError?: string | null
 }>()
@@ -50,6 +53,8 @@ const description = ref('')
 const status = ref<WorkStatus>('suggested')
 const type = ref<WorkType | null>(null)
 const priority = ref<WorkPriority | null>(null)
+// Beaucoup de travaux portent sur le logement entier : la pièce reste nulle.
+const room = ref<string | null>(null)
 const scheduledFor = ref('')
 const estimatedCost = ref<number | null>(null)
 const actualCost = ref<number | null>(null)
@@ -84,6 +89,7 @@ watch(() => props.open, (open) => {
     scheduledFor.value = toDateInputValue(w.scheduledFor)
     estimatedCost.value = w.estimatedCost
     actualCost.value = w.actualCost
+    room.value = w.room
   } else {
     title.value = ''
     description.value = ''
@@ -93,6 +99,7 @@ watch(() => props.open, (open) => {
     scheduledFor.value = ''
     estimatedCost.value = null
     actualCost.value = null
+    room.value = null
   }
 }, { immediate: true })
 
@@ -130,6 +137,7 @@ function onSave() {
     scheduledFor: scheduledFor.value || null,
     estimatedCost: normalizeCost(estimatedCost.value),
     actualCost: normalizeCost(actualCost.value),
+    room: room.value,
   })
 }
 
@@ -143,6 +151,10 @@ function toggleType(value: WorkType) {
 
 function togglePriority(value: WorkPriority) {
   priority.value = priority.value === value ? null : value
+}
+
+function toggleRoom(iri: string) {
+  room.value = room.value === iri ? null : iri
 }
 </script>
 
@@ -234,6 +246,26 @@ function togglePriority(value: WorkPriority) {
           </div>
         </div>
 
+        <label class="fld-label">
+          Pièce <span class="muted optional">· optionnel</span>
+        </label>
+        <div v-if="rooms.length" class="chips">
+          <button
+            v-for="r in rooms"
+            :key="r['@id']"
+            type="button"
+            class="chip"
+            :class="{ on: room === r['@id'] }"
+            @click="toggleRoom(r['@id'])"
+          >
+            <Icon :name="r.icon" :size="14" />
+            {{ r.name }}
+          </button>
+        </div>
+        <p v-else class="muted no-rooms">
+          Aucune pièce n'est définie pour ce logement.
+        </p>
+
         <label class="fld-label" for="work-date">
           Date prévue <span class="muted optional">· optionnel</span>
         </label>
@@ -304,6 +336,9 @@ function togglePriority(value: WorkPriority) {
 .modal-title {
   font-size: 21px;
   margin-top: 4px;
+}
+.no-rooms {
+  font-size: 13px;
 }
 .work-area {
   font-family: var(--sans);

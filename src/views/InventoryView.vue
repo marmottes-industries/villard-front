@@ -6,23 +6,29 @@ import Icon from '@/components/icons/Icon.vue'
 import InvRow from '@/components/inventory/InvRow.vue'
 import InventoryItemModal, { type ModalInitial } from '@/components/inventory/InventoryItemModal.vue'
 import { useInventory } from '@/composable/useInventory'
-import { useCategories } from '@/composable/useCategories'
+import { useRooms } from '@/composable/useRooms'
 import { useAuthStore } from '@/stores/auth'
 import { usePropertiesStore } from '@/stores/properties'
 import type { InventoryItem, InvState } from '@/api/inventory'
+import { ROOM_FALLBACK_ICON } from '@/utils/roomMeta'
 import { STATE_FILTERS } from '@/utils/inventoryState'
 
-type CatFilter = 'all' | string // 'all' ou IRI catégorie
+// Sentinelle du groupe « Sans pièce » : un article peut n'en avoir aucune, et
+// il doit rester visible — sinon ceux créés par un client pas encore à jour, ou
+// dont la pièce a été supprimée, disparaissent silencieusement.
+const UNASSIGNED = '__none__'
+
+type RoomFilter = 'all' | typeof UNASSIGNED | string // ou IRI de pièce
 type StateFilter = InvState | 'all'
 
 const inventory = useInventory()
-const categories = useCategories()
+const rooms = useRooms()
 const auth = useAuthStore()
 const properties = usePropertiesStore()
 
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
 
-const cat = ref<CatFilter>('all')
+const room = ref<RoomFilter>('all')
 const state = ref<StateFilter>('all')
 const query = ref('')
 const actionError = ref<string | null>(null)
@@ -32,9 +38,9 @@ const modalInitial = ref<ModalInitial | null>(null)
 
 const initialState = computed(() => {
   // Loading global = les deux ressources en cours de chargement initial.
-  if (inventory.state.value === 'loading' || categories.state.value === 'loading') return 'loading'
+  if (inventory.state.value === 'loading' || rooms.state.value === 'loading') return 'loading'
   if (inventory.state.value === 'error') return 'error'
-  if (categories.state.value === 'error') return 'error'
+  if (rooms.state.value === 'error') return 'error'
   return 'ready'
 })
 
@@ -46,33 +52,48 @@ const counts = computed(() => ({
   replace: inventory.items.value.filter(i => i.state === 'replace').length,
 }))
 
+function matchesRoomFilter(item: InventoryItem) {
+  if (room.value === 'all') return true
+  if (room.value === UNASSIGNED) return item.room === null
+  return item.room === room.value
+}
+
 const filtered = computed<InventoryItem[]>(() => {
   const q = query.value.trim().toLowerCase()
   return inventory.items.value
     .filter(i =>
-      (cat.value === 'all' || i.category === cat.value) &&
+      matchesRoomFilter(i) &&
       (state.value === 'all' || i.state === state.value) &&
       (q === '' || `${i.name} ${i.location ?? ''} ${i.note ?? ''}`.toLowerCase().includes(q)),
     )
     .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
 })
 
-// Catégories visibles : celles qui ont des items aujourd'hui (réactif) + la catégorie actuellement sélectionnée si filtre actif.
-const visibleCategories = computed(() => {
-  const used = new Set(inventory.items.value.map(i => i.category))
-  if (cat.value !== 'all') used.add(cat.value)
-  return categories.items.value.filter(c => used.has(c['@id']))
+// Pièces visibles : celles qui ont des articles aujourd'hui (réactif) + celle
+// actuellement sélectionnée si un filtre est actif.
+const visibleRooms = computed(() => {
+  const used = new Set(inventory.items.value.map(i => i.room))
+  if (room.value !== 'all' && room.value !== UNASSIGNED) used.add(room.value)
+  return rooms.items.value.filter(r => used.has(r['@id']))
 })
 
-const categoriesShownInList = computed(() =>
-  cat.value === 'all'
-    ? visibleCategories.value
-    : visibleCategories.value.filter(c => c['@id'] === cat.value),
+const hasUnassigned = computed(() => inventory.items.value.some(i => i.room === null))
+
+const roomsShownInList = computed(() =>
+  room.value === 'all' || room.value === UNASSIGNED
+    ? visibleRooms.value
+    : visibleRooms.value.filter(r => r['@id'] === room.value),
 )
 
-function itemsOfCategory(iri: string) {
-  return filtered.value.filter(i => i.category === iri)
+const showUnassignedSection = computed(
+  () => hasUnassigned.value && (room.value === 'all' || room.value === UNASSIGNED),
+)
+
+function itemsOfRoom(iri: string) {
+  return filtered.value.filter(i => i.room === iri)
 }
+
+const unassignedItems = computed(() => filtered.value.filter(i => i.room === null))
 
 async function onPatch(
   id: number,
@@ -89,7 +110,7 @@ async function onPatch(
 function onNew() {
   modalInitial.value = {
     mode: 'create',
-    defaultCategory: cat.value !== 'all' ? cat.value : undefined,
+    defaultRoom: room.value !== 'all' && room.value !== UNASSIGNED ? room.value : undefined,
   }
   modalOpen.value = true
 }
@@ -104,6 +125,7 @@ function closeModal() {
   modalInitial.value = null
 }
 
+// `category` n'est plus envoyée : elle est dépréciée côté API (cf. API.md §4.3).
 async function onSave(payload: {
   id: number | null
   name: string
@@ -111,7 +133,7 @@ async function onSave(payload: {
   state: InvState
   location: string | null
   note: string | null
-  category: string
+  room: string | null
 }) {
   actionError.value = null
   try {
@@ -122,7 +144,7 @@ async function onSave(payload: {
         state: payload.state,
         location: payload.location,
         note: payload.note,
-        category: payload.category,
+        room: payload.room,
       })
     } else {
       await inventory.update(payload.id, {
@@ -131,7 +153,7 @@ async function onSave(payload: {
         state: payload.state,
         location: payload.location,
         note: payload.note,
-        category: payload.category,
+        room: payload.room,
       })
     }
     closeModal()
@@ -150,7 +172,7 @@ async function onRemove(id: number) {
   }
 }
 async function retryInitial() {
-  await Promise.all([inventory.fetchAll(), categories.fetchAll()])
+  await Promise.all([inventory.fetchAll(), rooms.fetchAll()])
 }
 </script>
 
@@ -185,7 +207,7 @@ async function retryInitial() {
 
       <div v-else-if="initialState === 'error'" class="card pad-center">
         <p class="error-msg">
-          {{ inventory.errorMessage.value ?? categories.errorMessage.value ?? 'Erreur de chargement.' }}
+          {{ inventory.errorMessage.value ?? rooms.errorMessage.value ?? 'Erreur de chargement.' }}
         </p>
         <button class="btn" @click="retryInitial">Réessayer</button>
       </div>
@@ -222,26 +244,36 @@ async function retryInitial() {
         </div>
 
         <div class="filt-bar">
-          <div class="chips" role="tablist" aria-label="Filtrer par catégorie">
+          <div class="chips" role="tablist" aria-label="Filtrer par pièce">
             <button
               class="chip"
-              :class="{ on: cat === 'all' }"
+              :class="{ on: room === 'all' }"
               role="tab"
-              :aria-selected="cat === 'all'"
-              @click="cat = 'all'"
+              :aria-selected="room === 'all'"
+              @click="room = 'all'"
             >
               Tout
             </button>
             <button
-              v-for="c in visibleCategories"
-              :key="c['@id']"
+              v-for="r in visibleRooms"
+              :key="r['@id']"
               class="chip"
-              :class="{ on: cat === c['@id'] }"
+              :class="{ on: room === r['@id'] }"
               role="tab"
-              :aria-selected="cat === c['@id']"
-              @click="cat = c['@id']"
+              :aria-selected="room === r['@id']"
+              @click="room = r['@id']"
             >
-              <Icon :name="c.icon" :size="14" />{{ c.name }}
+              <Icon :name="r.icon" :size="14" />{{ r.name }}
+            </button>
+            <button
+              v-if="hasUnassigned"
+              class="chip"
+              :class="{ on: room === UNASSIGNED }"
+              role="tab"
+              :aria-selected="room === UNASSIGNED"
+              @click="room = UNASSIGNED"
+            >
+              <Icon :name="ROOM_FALLBACK_ICON" :size="14" />Sans pièce
             </button>
           </div>
           <div class="seg push-right" aria-label="Filtrer par état">
@@ -256,18 +288,18 @@ async function retryInitial() {
           </div>
         </div>
 
-        <template v-for="c in categoriesShownInList" :key="c['@id']">
-          <section v-if="itemsOfCategory(c['@id']).length" class="inv-cat">
+        <template v-for="r in roomsShownInList" :key="r['@id']">
+          <section v-if="itemsOfRoom(r['@id']).length" class="inv-cat">
             <header class="inv-cat-head">
-              <Icon :name="c.icon" :size="17" />
-              <h3>{{ c.name }}</h3>
+              <Icon :name="r.icon" :size="17" />
+              <h3>{{ r.name }}</h3>
               <span class="mono muted cat-count">
-                {{ itemsOfCategory(c['@id']).length }} réf.
+                {{ itemsOfRoom(r['@id']).length }} réf.
               </span>
             </header>
             <div class="inv-cat-body card">
               <InvRow
-                v-for="it in itemsOfCategory(c['@id'])"
+                v-for="it in itemsOfRoom(r['@id'])"
                 :key="it.id"
                 :item="it"
                 @patch="onPatch"
@@ -276,6 +308,24 @@ async function retryInitial() {
             </div>
           </section>
         </template>
+
+        <!-- Toujours en dernier : ces articles attendent d'être rangés. -->
+        <section v-if="showUnassignedSection && unassignedItems.length" class="inv-cat">
+          <header class="inv-cat-head">
+            <Icon :name="ROOM_FALLBACK_ICON" :size="17" />
+            <h3>Sans pièce</h3>
+            <span class="mono muted cat-count">{{ unassignedItems.length }} réf.</span>
+          </header>
+          <div class="inv-cat-body card">
+            <InvRow
+              v-for="it in unassignedItems"
+              :key="it.id"
+              :item="it"
+              @patch="onPatch"
+              @edit="onEdit"
+            />
+          </div>
+        </section>
 
         <div v-if="!filtered.length" class="empty">
           <Icon name="search" :size="26" class="muted-icon" />
@@ -288,7 +338,7 @@ async function retryInitial() {
   <InventoryItemModal
       :open="modalOpen"
       :initial="modalInitial"
-      :categories="categories.items.value"
+      :rooms="rooms.items.value"
       :can-delete="isAdmin && modalInitial?.mode === 'edit'"
       @close="closeModal"
       @save="onSave"

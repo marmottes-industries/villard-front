@@ -8,9 +8,12 @@ export type InventoryItem = {
     name: string
     quantity: number
     state: InvState
+    // Précision de rangement DANS la pièce (« placard du haut »), pas la pièce.
     location: string | null
     note: string | null
-    category: string // IRI category
+    room: string | null // IRI '/api/rooms/{id}'
+    /** @deprecated Remplacé par `room`, retiré à la prochaine majeure de l'API. */
+    category: string | null
     property: string // IRI '/api/properties/{id}'
 }
 
@@ -20,7 +23,7 @@ export type InventoryCreatePayload = {
     state: InvState
     location?: string | null
     note?: string | null
-    category: string
+    room?: string | null
     property: string
 }
 

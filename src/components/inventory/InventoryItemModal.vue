@@ -3,17 +3,17 @@ import { computed, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import Stepper from '@/components/inventory/Stepper.vue'
 import type { InventoryItem, InvState } from '@/api/inventory'
-import type { DisplayCategory } from '@/composable/useCategories'
+import type { DisplayRoom } from '@/composable/useRooms'
 import { STATE_META } from '@/utils/inventoryState'
 
 export type ModalInitial =
-  | { mode: 'create'; defaultCategory?: string }
+  | { mode: 'create'; defaultRoom?: string }
   | { mode: 'edit'; item: InventoryItem }
 
 const props = defineProps<{
   open: boolean
   initial: ModalInitial | null
-  categories: DisplayCategory[]
+  rooms: DisplayRoom[]
   canDelete: boolean
 }>()
 
@@ -26,7 +26,7 @@ const emit = defineEmits<{
     state: InvState
     location: string | null
     note: string | null
-    category: string
+    room: string | null
   }]
   remove: [id: number]
 }>()
@@ -36,7 +36,7 @@ const quantity = ref(0)
 const state = ref<InvState>('ok')
 const location = ref('')
 const note = ref('')
-const category = ref<string>('')
+const room = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const saving = ref(false)
 
@@ -60,25 +60,29 @@ watch(() => props.open, (open) => {
     state.value = it.state
     location.value = it.location ?? ''
     note.value = it.note ?? ''
-    category.value = it.category
+    room.value = it.room
   } else {
     name.value = ''
     quantity.value = 1
     state.value = 'ok'
     location.value = ''
     note.value = ''
-    category.value = init.defaultCategory ?? props.categories[0]?.['@id'] ?? ''
+    // Pas de repli sur la première pièce de la liste : « aucune pièce » est un
+    // état légitime, et choisir arbitrairement à la place de l'utilisateur
+    // range mal l'article sans qu'il s'en rende compte.
+    room.value = init.defaultRoom ?? null
   }
 }, { immediate: true })
+
+// Bascule à la manière de `WorkModal` : re-cliquer la pièce active la retire.
+function toggleRoom(iri: string) {
+  room.value = room.value === iri ? null : iri
+}
 
 function onSave() {
   errorMessage.value = null
   if (!name.value.trim()) {
     errorMessage.value = 'Renseigne un nom.'
-    return
-  }
-  if (!category.value) {
-    errorMessage.value = 'Choisis une catégorie.'
     return
   }
   if (quantity.value < 0) {
@@ -93,7 +97,7 @@ function onSave() {
     state: state.value,
     location: location.value.trim() || null,
     note: note.value.trim() || null,
-    category: category.value,
+    room: room.value,
   })
 }
 
@@ -127,19 +131,25 @@ function onDelete() {
           autocomplete="off"
         />
 
-        <label class="fld-label">Catégorie</label>
-        <div class="chips">
+        <label class="fld-label">
+          Pièce <span class="muted optional">· optionnel</span>
+        </label>
+        <div v-if="rooms.length" class="chips">
           <button
-            v-for="c in categories"
-            :key="c['@id']"
+            v-for="r in rooms"
+            :key="r['@id']"
             type="button"
             class="chip"
-            :class="{ on: category === c['@id'] }"
-            @click="category = c['@id']"
+            :class="{ on: room === r['@id'] }"
+            @click="toggleRoom(r['@id'])"
           >
-            <Icon :name="c.icon" :size="14" />{{ c.name }}
+            <Icon :name="r.icon" :size="14" />{{ r.name }}
           </button>
         </div>
+        <p v-else class="muted no-rooms">
+          Aucune pièce n'est définie pour ce logement. Un gestionnaire peut en créer
+          depuis Logements → Pièces.
+        </p>
 
         <div class="fld-grid two">
           <div>
@@ -169,14 +179,15 @@ function onDelete() {
           </div>
         </div>
 
+        <!-- Complète la pièce, ne la remplace pas : où DANS la pièce. -->
         <label class="fld-label" for="m-location">
-          Emplacement <span class="muted optional">· optionnel</span>
+          Rangement <span class="muted optional">· optionnel</span>
         </label>
         <input
           id="m-location"
           class="fld"
           v-model="location"
-          placeholder="Ex. Placard couloir, Cabane skis…"
+          placeholder="Ex. placard du haut, sous le lit…"
           autocomplete="off"
         />
 
@@ -220,6 +231,10 @@ function onDelete() {
 .modal-title {
   font-size: 21px;
   margin-top: 4px;
+}
+.no-rooms {
+  font-size: 13px;
+  line-height: 1.4;
 }
 .fld-grid.two {
   grid-template-columns: 1fr 1fr;

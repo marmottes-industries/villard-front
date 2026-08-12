@@ -9,6 +9,7 @@ import WorkModal, {
   type WorkSavePayload,
 } from '@/components/work/WorkModal.vue'
 import { useWork } from '@/composable/useWork'
+import { useRooms } from '@/composable/useRooms'
 import { useUsers } from '@/composable/useUsers'
 import { useAuthStore } from '@/stores/auth'
 import { usePropertiesStore } from '@/stores/properties'
@@ -20,6 +21,7 @@ import {
 } from '@/utils/workMeta'
 
 const works = useWork()
+const rooms = useRooms()
 const users = useUsers()
 const auth = useAuthStore()
 const properties = usePropertiesStore()
@@ -166,6 +168,7 @@ async function onSave(payload: WorkSavePayload) {
       scheduledFor: payload.scheduledFor,
       estimatedCost: payload.estimatedCost,
       actualCost: payload.actualCost,
+      room: payload.room,
     }
     if (payload.id === null) {
       await works.create(body)
@@ -309,6 +312,7 @@ async function retryInitial() {
   <WorkModal
     :open="modalOpen"
     :initial="modalInitial"
+    :rooms="rooms.items.value"
     :can-delete="canDeleteCurrent"
     :save-error="modalSaveError"
     @close="closeModal"

@@ -13,6 +13,11 @@ const ICON_BY_NAME: Record<string, string> = {
     'Cave': 'gear',
 }
 
+/**
+ * Ne sert plus qu'aux courses : l'inventaire est passé aux pièces
+ * (cf. `useRooms`). Un `forInventory` a été retiré ici, `inventoryItems` se
+ * vidant à mesure que les articles cessent de porter une catégorie.
+ */
 export type DisplayCategory = Category & { icon: string }
 
 export function useCategories() {
@@ -37,10 +42,6 @@ export function useCategories() {
         }
     }
 
-    const forInventory = computed(() =>
-        items.value.filter(c => c.inventoryItems.length > 0),
-    )
-
     const forShopping = computed(() =>
         items.value.filter(c => c.shoppingItems.length > 0),
     )
@@ -51,5 +52,5 @@ export function useCategories() {
 
     onMounted(fetchAll)
 
-    return {items, forInventory, forShopping, state, errorMessage, fetchAll, findByIri}
+    return {items, forShopping, state, errorMessage, fetchAll, findByIri}
 }

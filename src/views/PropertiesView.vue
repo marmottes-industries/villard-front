@@ -5,6 +5,7 @@ import AppTopbar from '@/components/shell/AppTopbar.vue'
 import Icon from '@/components/icons/Icon.vue'
 import PropertyModal, { type ModalInitial } from '@/components/properties/PropertyModal.vue'
 import PropertyMembersModal from '@/components/properties/PropertyMembersModal.vue'
+import PropertyRoomsModal from '@/components/properties/PropertyRoomsModal.vue'
 import { formatError } from '@/utils/formatError'
 import { propertiesApi, type Property, type PropertyCreatePayload } from '@/api/properties'
 import { usePropertiesStore } from '@/stores/properties'
@@ -28,6 +29,9 @@ const modalInitial = ref<ModalInitial | null>(null)
 
 const membersOpen = ref(false)
 const membersProperty = ref<Property | null>(null)
+
+const roomsOpen = ref(false)
+const roomsProperty = ref<Property | null>(null)
 
 // POST et DELETE sur un logement sont réservés à ROLE_ADMIN (cf. API.md §4.9).
 const isAdmin = computed(() => auth.user?.roles.includes('ROLE_ADMIN') ?? false)
@@ -69,6 +73,11 @@ function onEdit(property: Property) {
 function closeModal() {
   modalOpen.value = false
   modalInitial.value = null
+}
+
+function openRooms(property: Property) {
+  roomsProperty.value = property
+  roomsOpen.value = true
 }
 
 function openMembers(property: Property) {
@@ -176,6 +185,10 @@ onMounted(fetchAll)
                 <Icon name="users" :size="15" />
                 Membres
               </button>
+              <button class="btn sm" @click="openRooms(p)">
+                <Icon name="door" :size="15" />
+                Pièces
+              </button>
               <button v-if="canManage(p)" class="btn sm" @click="onEdit(p)">
                 <Icon name="edit" :size="15" />
                 Modifier
@@ -214,6 +227,13 @@ onMounted(fetchAll)
     :property="membersProperty"
     :can-manage="membersProperty ? canManage(membersProperty) : false"
     @close="membersOpen = false"
+  />
+
+  <PropertyRoomsModal
+    :open="roomsOpen"
+    :property="roomsProperty"
+    :can-manage="roomsProperty ? canManage(roomsProperty) : false"
+    @close="roomsOpen = false"
   />
 </template>
 

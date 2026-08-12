@@ -19,6 +19,7 @@ export type Work = {
     completedAt: string | null
     estimatedCost: number | null
     actualCost: number | null
+    room: string | null // IRI '/api/rooms/{id}' — null si non localisés
     property: string // IRI '/api/properties/{id}'
 }
 
@@ -32,6 +33,7 @@ export type WorkCreatePayload = {
     scheduledFor?: string | null
     estimatedCost?: number | null
     actualCost?: number | null
+    room?: string | null
     property: string
 }
 

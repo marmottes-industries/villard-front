@@ -106,10 +106,39 @@ Côté serveur :
 
 ### 2.4 Rôles
 
+**Rôles globaux :**
+
 - `ROLE_USER` : utilisateur connecté (par défaut pour tout user).
-- `ROLE_ADMIN` : suppressions sensibles + création/suppression d'utilisateurs.
+- `ROLE_ADMIN` : super-rôle — création/suppression d'utilisateurs, et **accès complet à tous les logements** (voir §2.5).
+
+**Rôles locaux, par logement** (portés par `PropertyMember`) :
+
+- `manager` (gestionnaire) : administre le logement, ses membres, et les ressources de tous les membres.
+- `occupant` : lecture complète du logement ; écriture sur ses propres séjours, notes et travaux, plus l'inventaire et les courses.
 
 Voir la matrice de permissions par ressource ci-dessous.
+
+### 2.5 Logements et cloisonnement — à lire avant de coder un client
+
+Toutes les données métier (`Occupation`, `Work`, `InventoryItem`, `ShoppingItem`, `Note`, `Room`) appartiennent à un **logement** (`Property`). Le serveur cloisonne, le client n'a rien à sécuriser :
+
+| Situation | Comportement serveur |
+|-----------|----------------------|
+| `GET /api/notes` sans filtre | Renvoie **déjà** uniquement les notes des logements dont l'utilisateur est membre |
+| `GET /api/notes?property=<IRI autorisée>` | Restreint au logement demandé — c'est l'usage normal du sélecteur de logement |
+| `GET /api/notes?property=<IRI interdite>` | Collection **vide**, jamais les données de l'autre logement |
+| `GET /api/notes/{id}` d'un autre logement | `404` (pas `403` : l'existence n'est même pas confirmée) |
+| `POST` avec une `property` interdite | `400 Item not found` |
+| `POST` **sans** `property`, utilisateur mono-logement | `201` — le logement est appliqué automatiquement |
+| `POST` **sans** `property`, utilisateur multi-logements | `422` avec un message explicite |
+
+Le repli mono-logement existe pour que les builds mobiles antérieurs continuent de fonctionner. **Un client à jour doit toujours envoyer `property`** en création, et propager `?property=` en lecture.
+
+**`Room` fait exception à la ligne « `POST` sans `property` » du tableau** : ses écritures exigent le gestionnaire, et omettre `property` y renvoie `403` au lieu d'appliquer le repli. Cf. §4.11.
+
+`Category` est **commune à tous les logements**, mais ne sert plus qu'aux **courses**. Le rangement de l'inventaire passe par `Room`, propre à chaque logement (§4.11).
+
+`GET /api/me` renvoie les logements de l'utilisateur et son rôle local dans chacun : c'est tout ce qu'il faut pour amorcer un sélecteur de logement, sans second appel. Voir §7.
 
 ---
 
@@ -184,18 +213,23 @@ Authentification système. **Identifiant URL = `id` numérique.** L'`uuid` est i
 {
     "id": 1,
     "username": "alice",
+    "email": "alice@example.com",
     "roles": [
         "ROLE_USER"
     ]
 }
 ```
 
-**Écriture (`user:write`)** — seul `username` est exposé en write par les groupes de sérialisation. Le mot de passe
-n'est pas modifiable via cet endpoint.
+**Écriture (`user:write`)** — `username` et `email` sont exposés en write par les groupes de sérialisation. Le mot de
+passe n'est pas modifiable via cet endpoint.
+
+- `email` (string, optionnel) — adresse de notification. Validée (`Assert\Email`). Sert à l'envoi des e-mails du système
+  de notification (cf. §11). `null` = l'utilisateur ne recevra pas d'e-mail.
 
 > ⚠️ **Conséquence** : `POST /api/users` ne peut pas définir de mot de passe → impossible de créer un compte utilisable
 > directement par l'API tant que `password` n'est pas ajouté au groupe `user:write`. Pour créer un user en pratique,
-> utiliser la commande CLI côté backend : `php bin/console app:create-user <username>` (cf. `CreateUserCommand`).
+> utiliser la commande CLI côté backend : `php bin/console app:create-user <username> [--email <email>]`
+> (cf. `CreateUserCommand`).
 
 ### 4.2 Category — `/api/categories`
 
@@ -212,42 +246,54 @@ n'est pas modifiable via cet endpoint.
 
 Relations exposées par défaut (JSON-LD) : `inventoryItems`, `shoppingItems` (IRIs).
 
+> `Category` ne sert plus qu'aux **courses**. Sur l'inventaire, elle est remplacée par `Room` (§4.11) : les catégories réellement en base (« Cuisine », « Chambre », « Salle de bain ») étaient des pièces, mais une catégorie est commune à tous les logements et ne peut donc pas se décliner. Ne plus l'envoyer en créant un article.
+
 ### 4.3 InventoryItem — `/api/inventory_items`
 
-Inventaire de l'appartement. `category` est **obligatoire**.
+Inventaire de l'appartement.
 
-| Op                       | Sécurité     |
-|--------------------------|--------------|
-| GET / POST / PUT / PATCH | `ROLE_USER`  |
-| DELETE                   | `ROLE_ADMIN` |
+| Op                      | Sécurité                                       |
+|-------------------------|------------------------------------------------|
+| GET collection          | `ROLE_USER` — cloisonné par logement (cf. §2.5) |
+| GET item                | membre du logement                             |
+| POST / PUT / PATCH      | membre du logement                             |
+| DELETE                  | **gestionnaire** du logement                   |
 
 ```json
 {
     "id": 12,
     "name": "Casseroles",
     "quantity": 3,
-    "category": "/api/categories/1",
+    "room": "/api/rooms/4",
+    "category": null,
     "state": "ok",
     "note": "Une casserole a perdu son manche",
-    "location": "Placard sous l'évier"
+    "location": "Placard sous l'évier",
+    "property": "/api/properties/1"
 }
 ```
 
 Champs :
 
-- `category` (IRI, **requis**) — passer la catégorie en IRI (`"/api/categories/1"`), convention API Platform.
+- `room` (IRI Room, optionnel) — la pièce où se trouve l'article (cf. §4.11). Elle **doit** appartenir au même logement que l'article, sinon `422`.
+- `category` (IRI, optionnel) — **déprécié**, remplacé par `room`. Encore accepté le temps que les clients basculent, retiré à la prochaine majeure. Ne plus l'envoyer.
 - `state` (enum, défaut `"ok"`) — valeurs possibles : `"ok"` (Bon état), `"worn"` (Abimé), `"replace"` (À remplacer).
 - `note` (string, optionnel) — précision libre sur l'item (jusqu'à 255 caractères).
-- `location` (string, optionnel) — emplacement physique dans le logement (255 caractères).
+- `location` (string, optionnel) — **inchangé**, et à ne pas confondre avec `room` : `room` dit dans quelle pièce, `location` dit où **dans** cette pièce (« placard du haut », « sous le lit »). 255 caractères.
+- `property` (IRI Property, **requis**) — le logement. Auto-rempli en `POST` si l'utilisateur n'en a qu'un (cf. §2.5).
+
+> Un article peut n'avoir **aucune** pièce (`room: null`) : c'est le cas de ceux créés par un client pas encore à jour, et de ceux dont la pièce a été supprimée. Prévoir un groupe « Sans pièce » dans les listes, sans quoi ces articles disparaissent silencieusement de l'affichage.
 
 ### 4.4 ShoppingItem — `/api/shopping_items`
 
 Liste de courses. `category` est **optionnelle**.
 
-| Op                       | Sécurité     |
-|--------------------------|--------------|
-| GET / POST / PUT / PATCH | `ROLE_USER`  |
-| DELETE                   | `ROLE_ADMIN` |
+| Op                      | Sécurité                                       |
+|-------------------------|------------------------------------------------|
+| GET collection          | `ROLE_USER` — cloisonné par logement (cf. §2.5) |
+| GET item                | membre du logement                             |
+| POST / PUT / PATCH      | membre du logement                             |
+| DELETE                  | **gestionnaire** du logement                   |
 
 ```json
 {
@@ -255,17 +301,20 @@ Liste de courses. `category` est **optionnelle**.
     "name": "Lait",
     "quantity": 2,
     "purchased": false,
-    "category": "/api/categories/1"
+    "category": "/api/categories/1",
+    "property": "/api/properties/1"
 }
 ```
 
 ### 4.5 Note — `/api/notes`
 
-| Op                      | Sécurité                                         |
-|-------------------------|--------------------------------------------------|
-| GET (collection / item) | `ROLE_USER`                                      |
-| POST                    | `ROLE_ADMIN` **ou** auteur = utilisateur courant |
-| PUT / PATCH / DELETE    | `ROLE_ADMIN` **ou** auteur de la note            |
+| Op                      | Sécurité                                                            |
+|-------------------------|---------------------------------------------------------------------|
+| GET collection          | `ROLE_USER` — cloisonné par logement (cf. §2.5)                      |
+| GET item                | membre du logement                                                   |
+| POST                    | membre du logement                                                   |
+| PUT / PATCH             | membre du logement **et** (gestionnaire **ou** auteur avant et après) |
+| DELETE                  | gestionnaire du logement **ou** auteur de la note                    |
 
 ```json
 {
@@ -273,23 +322,27 @@ Liste de courses. `category` est **optionnelle**.
     "title": "Code du portail",
     "content": "1234B",
     "createdAt": "2026-01-15T10:00:00+00:00",
-    "author": "/api/users/2"
+    "author": "/api/users/2",
+    "property": "/api/properties/1"
 }
 ```
 
-> En `POST`, `author` doit pointer sur l'utilisateur courant (sauf admin). **`createdAt` est auto-rempli côté serveur**
-> (timestamp UTC à l'instant de la création) et lecture seule — toute valeur envoyée par le client est ignorée, y
-> compris en `PUT`/`PATCH`.
+> En `POST`, `author` peut être **omis** : le serveur l'assigne à l'utilisateur courant. S'il est fourni, il doit
+> pointer sur l'utilisateur courant (sauf gestionnaire du logement ou admin). **`createdAt` est auto-rempli côté
+> serveur** (timestamp UTC à l'instant de la création) et lecture seule — toute valeur envoyée par le client est
+> ignorée, y compris en `PUT`/`PATCH`. `property` est **requis**, avec repli mono-logement (cf. §2.5).
 
 ### 4.6 Occupation — `/api/occupations`
 
 Calendrier d'occupation de l'appartement.
 
-| Op                      | Sécurité                                             |
-|-------------------------|------------------------------------------------------|
-| GET (collection / item) | `ROLE_USER`                                          |
-| POST                    | `ROLE_ADMIN` **ou** `occupant` = utilisateur courant |
-| PUT / PATCH / DELETE    | `ROLE_ADMIN` **ou** occupant de la période           |
+| Op                      | Sécurité                                                              |
+|-------------------------|-----------------------------------------------------------------------|
+| GET collection          | `ROLE_USER` — cloisonné par logement (cf. §2.5)                        |
+| GET item                | membre du logement                                                     |
+| POST                    | membre du logement **et** (gestionnaire **ou** `occupant` = user)      |
+| PUT / PATCH             | membre du logement **et** (gestionnaire **ou** occupant avant et après) |
+| DELETE                  | gestionnaire du logement **ou** occupant de la période                 |
 
 ```json
 {
@@ -297,23 +350,30 @@ Calendrier d'occupation de l'appartement.
     "startDate": "2026-07-01",
     "endDate": "2026-07-15",
     "notes": "Vacances d'été",
-    "occupant": "/api/users/2"
+    "occupant": "/api/users/2",
+    "property": "/api/properties/1",
+    "endNotifiedAt": null
 }
 ```
 
 Dates au format ISO 8601 (`YYYY-MM-DD` accepté pour les `date_immutable`).
+
+- `endNotifiedAt` (datetime, **lecture seule**) — horodatage interne posé par la commande de notification de fin de
+  séjour (cf. §11) pour garantir son idempotence. Toute valeur envoyée par le client est ignorée. Vaut `null` tant
+  qu'aucune notification de fin n'a été émise pour cette occupation.
 
 ### 4.7 Work — `/api/works`
 
 Travaux à réaliser dans l'appartement (bricolage à faire soi-même ou prestation externe). Suivi du cycle de vie via `status`,
 priorisation et chiffrage estimé / réel.
 
-| Op                      | Sécurité                                          |
-|-------------------------|---------------------------------------------------|
-| GET (collection / item) | `ROLE_USER`                                       |
-| POST                    | `ROLE_ADMIN` **ou** auteur = utilisateur courant  |
-| PUT / PATCH             | `ROLE_ADMIN` **ou** auteur (avant **et** après) = user courant |
-| DELETE                  | `ROLE_ADMIN` **ou** auteur = utilisateur courant  |
+| Op                      | Sécurité                                                            |
+|-------------------------|---------------------------------------------------------------------|
+| GET collection          | `ROLE_USER` — cloisonné par logement (cf. §2.5)                      |
+| GET item                | membre du logement                                                   |
+| POST                    | membre du logement                                                   |
+| PUT / PATCH             | membre du logement **et** (gestionnaire **ou** auteur avant et après) |
+| DELETE                  | gestionnaire du logement **ou** auteur des travaux                   |
 
 ```json
 {
@@ -324,6 +384,8 @@ priorisation et chiffrage estimé / réel.
     "type": "diy",
     "priority": "medium",
     "author": "/api/users/2",
+    "property": "/api/properties/1",
+    "room": "/api/rooms/6",
     "createdAt": "2026-06-09T09:30:00+00:00",
     "scheduledFor": "2026-07-12",
     "completedAt": null,
@@ -340,6 +402,8 @@ Champs :
 - `type` (enum, optionnel) : `"diy"` (à faire soi-même) ou `"pro"` (à faire faire).
 - `priority` (enum, optionnel) : `"low"`, `"medium"`, `"high"`.
 - `author` (IRI User, **requis**) — auto-rempli avec l'utilisateur courant en `POST` si omis.
+- `property` (IRI Property, **requis**) — le logement. Auto-rempli en `POST` si l'utilisateur n'en a qu'un (cf. §2.5).
+- `room` (IRI Room, optionnel) — pièce concernée, quand les travaux sont localisés (cf. §4.11). Beaucoup portent sur le logement entier et restent à `null`. Elle **doit** appartenir au même logement que les travaux, sinon `422`.
 - `createdAt` (datetime, ISO 8601) — **auto-rempli côté serveur à la création**, lecture seule.
 - `scheduledFor` (date, `YYYY-MM-DD`, optionnel) — date prévue.
 - `completedAt` (datetime, optionnel) — **auto-rempli côté serveur dès que `status` passe à `"done"`** si non fourni
@@ -350,6 +414,181 @@ Champs :
 > Implémenté via le processor `App\State\WorkProcessor`. À la création (`POST`), il pose `createdAt = now()` et assigne
 > `author = utilisateur courant` si le champ est vide. À chaque écriture (toutes opérations), si `status === "done"` et
 > que `completedAt` n'est pas fourni, le serveur le pose à `now()`.
+
+### 4.8 DeviceToken — `/api/device_tokens`
+
+Cible de notification push enregistrée par un client (une ligne par appareil/install). Le `token` est un **Expo push
+token** (`"ExponentPushToken[…]"`). Sert au système de notification push (cf. §11).
+
+| Op            | Sécurité                                       |
+|---------------|------------------------------------------------|
+| GET collection| `ROLE_ADMIN`                                   |
+| GET item      | `ROLE_ADMIN` **ou** propriétaire du token      |
+| POST          | `ROLE_USER`                                     |
+| DELETE        | `ROLE_ADMIN` **ou** propriétaire du token      |
+
+Pas de `PUT`/`PATCH` : la mise à jour se fait par ré-enregistrement (upsert, voir ci-dessous).
+
+**Lecture (`device_token:read`)**
+
+```json
+{
+    "id": 9,
+    "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+    "platform": "ios",
+    "owner": "/api/users/2",
+    "createdAt": "2026-06-11T08:30:00+00:00",
+    "lastSeenAt": "2026-06-11T08:30:00+00:00"
+}
+```
+
+**Écriture (`device_token:write`)** — seuls `token` et `platform` sont acceptés :
+
+```json
+{
+    "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+    "platform": "ios"
+}
+```
+
+Champs :
+
+- `token` (string, **requis**, unique) — Expo push token de l'install.
+- `platform` (enum, **requis**) : `"ios"`, `"android"` ou `"web"`.
+- `owner` (IRI User, **lecture seule**) — auto-assigné à l'utilisateur courant en `POST`.
+- `createdAt` / `lastSeenAt` (datetime, **lecture seule**) — auto-remplis côté serveur.
+
+> **Upsert par `token`** (processor `App\State\DeviceTokenProcessor`) : ré-enregistrer le même token (typiquement à
+> chaque login) **ne crée pas de doublon** — la ligne existante est réutilisée, son `owner` ré-assigné à l'utilisateur
+> courant et `lastSeenAt` mis à `now()`. Le client peut donc `POST` le même token sans gérer l'existant lui-même.
+> Pour désinscrire un appareil (logout, désactivation des notifs) : `DELETE /api/device_tokens/{id}`. La suppression
+> d'un utilisateur supprime ses device tokens en cascade.
+
+### 4.9 Property — `/api/properties`
+
+Un logement. Porte aussi ses coordonnées météo (cf. §12).
+
+| Op             | Sécurité                                        |
+|----------------|-------------------------------------------------|
+| GET collection | `ROLE_USER` — ne renvoie que ses propres logements |
+| GET item       | membre du logement                              |
+| POST           | `ROLE_ADMIN`                                    |
+| PATCH          | **gestionnaire** du logement                    |
+| DELETE         | `ROLE_ADMIN`                                    |
+
+Pas de `PUT`.
+
+```json
+{
+    "id": 1,
+    "name": "Les Tennis",
+    "slug": "les-tennis",
+    "city": "Villard-de-Lans",
+    "address": "12 rue des Clarines",
+    "latitude": 45.064757765580204,
+    "longitude": 5.548400944891808,
+    "timezone": "Europe/Paris",
+    "secondaryLocationName": "Côte 2000",
+    "secondaryLatitude": 45.0186219050606,
+    "secondaryLongitude": 5.571823469177524,
+    "accentColor": "forest",
+    "accentHex": "#2E4A39",
+    "archived": false
+}
+```
+
+Champs :
+
+- `name` (string, **requis**, 255) — nom affiché.
+- `slug` (string, **requis**, **unique**) — minuscules, chiffres et tirets uniquement (`^[a-z0-9]+(-[a-z0-9]+)*$`).
+- `city` (string, **requis**, 255).
+- `address` (string, optionnel, 255).
+- `latitude` / `longitude` (float, **requis**) — point météo principal, le logement lui-même.
+- `timezone` (string, défaut `"Europe/Paris"`) — identifiant de fuseau valide.
+- `secondaryLocationName` / `secondaryLatitude` / `secondaryLongitude` (optionnels) — point météo secondaire, typiquement
+  un domaine d'altitude. **Les trois vont ensemble** : le point n'est exploité que s'ils sont tous les trois renseignés.
+- `accentColor` (enum, défaut `"forest"`) — couleur d'accent du logement, cf. tableau ci-dessous. Une valeur hors palette
+  est rejetée en `400`.
+- `accentHex` (string, **lecture seule**) — hexadécimal correspondant à `accentColor`. À utiliser pour teinter
+  l'interface : le client n'a pas à embarquer la table de correspondance.
+- `archived` (bool, défaut `false`) — un logement archivé reste lisible ; au client de le masquer du sélecteur.
+
+Palette d'accents (fermée — chaque teinte tient le contraste AA avec du texte blanc) :
+
+| `accentColor` | `accentHex` | Libellé  |
+|---------------|-------------|----------|
+| `forest`      | `#2E4A39`   | Sapin    |
+| `lake`        | `#2C5159`   | Lac      |
+| `wood`        | `#97653A`   | Bois     |
+| `slate`       | `#4F6076`   | Ardoise  |
+| `plum`        | `#6E4B5E`   | Myrtille |
+| `lichen`      | `#5F6440`   | Lichen   |
+
+> ⚠️ Supprimer un logement qui porte encore des données échoue sur la contrainte de clé étrangère. Archiver, ou vider
+> le logement d'abord.
+
+### 4.10 PropertyMember — `/api/property_members`
+
+Appartenance d'un utilisateur à un logement, avec son rôle local. C'est **la** source de vérité du cloisonnement.
+
+| Op             | Sécurité                                                     |
+|----------------|--------------------------------------------------------------|
+| GET collection | `ROLE_USER` — appartenances de ses propres logements uniquement |
+| GET item       | membre du logement                                           |
+| POST           | **gestionnaire** du logement visé                            |
+| PATCH          | **gestionnaire** du logement (avant **et** après)            |
+| DELETE         | **gestionnaire** du logement                                 |
+
+Pas de `PUT`.
+
+```json
+{
+    "id": 8,
+    "property": "/api/properties/1",
+    "user": "/api/users/2",
+    "role": "manager"
+}
+```
+
+- `role` (enum, défaut `"occupant"`) : `"manager"` ou `"occupant"`.
+- Contrainte d'unicité sur `(property, user)` : un utilisateur n'a qu'un rôle par logement. Un doublon renvoie `422`.
+
+### 4.11 Room — `/api/rooms`
+
+Pièce d'un logement — « Chambre 1 », « Salle de bain étage », « Cabane à skis ». Remplace `Category` sur l'inventaire et localise les travaux.
+
+| Op                 | Sécurité                                          |
+|--------------------|---------------------------------------------------|
+| GET collection     | `ROLE_USER` — cloisonné par logement (cf. §2.5)   |
+| GET item           | membre du logement                                |
+| POST               | **gestionnaire** du logement visé                 |
+| PUT / PATCH        | **gestionnaire** du logement (avant **et** après) |
+| DELETE             | **gestionnaire** du logement                      |
+
+```json
+{
+    "id": 4,
+    "name": "Chambre parents",
+    "type": "bedroom",
+    "position": 2,
+    "archived": false,
+    "property": "/api/properties/1"
+}
+```
+
+Champs :
+
+- `name` (string, **requis**) — libre, jusqu'à 255 caractères. Unique dans le logement : un doublon renvoie `422`.
+- `type` (enum, optionnel) — `"kitchen"` (Cuisine), `"bathroom"` (Salle de bain), `"toilet"` (WC), `"bedroom"` (Chambre), `"living_room"` (Salon), `"office"` (Bureau), `"laundry"` (Buanderie), `"hallway"` (Couloir), `"garage"` (Garage), `"cellar"` (Cave), `"attic"` (Combles), `"outdoor"` (Extérieur). Pas de valeur « autre » : une pièce atypique reste `null`.
+- `position` (int, défaut 0) — ordre d'affichage décidé par le gestionnaire. **Trier dessus, pas alphabétiquement** : « Chambre 10 » passerait avant « Chambre 2 ».
+- `archived` (bool, défaut `false`).
+- `property` (IRI Property, **requis**).
+
+Trois points à connaître avant de coder un client :
+
+1. **Aucune icône n'est exposée.** C'est une décision d'interface, et le web et le mobile n'ont pas le même jeu disponible : dériver l'icône du `type` côté client, avec un repli pour `null`.
+2. **Le `POST` n'auto-remplit pas `property`.** Contrairement aux autres ressources, l'omettre renvoie `403` et non un repli mono-logement : l'échappatoire n'existe ailleurs que pour les anciens builds mobiles, et la conserver ici dégraderait le contrôle « gestionnaire » en « membre ». Toujours envoyer `property`.
+3. **Supprimer une pièce ne supprime rien d'autre.** Les articles et travaux rattachés sont détachés (`room` repasse à `null`) et restent visibles dans leur logement.
 
 ---
 
@@ -423,10 +662,27 @@ await api('/occupations', {
         startDate: '2026-07-01',
         endDate: '2026-07-15',
         notes: 'Vacances',
-        occupant: '/api/users/2', // IRI du user connecté
+        occupant: '/api/users/2',      // IRI du user connecté
+        property: '/api/properties/1', // logement actif — cf. §2.5
     }),
 })
 ```
+
+### 5.6 Lister les données du logement actif
+
+```ts
+// L'IRI vient du store de logement actif, amorcé depuis /api/me (§7).
+const q = new URLSearchParams({ property: activePropertyIri })
+
+const [notes, items, works] = await Promise.all([
+    api(`/notes?${q}`),
+    api(`/inventory_items?${q}`),
+    api(`/works?${q}`),
+])
+```
+
+Omettre `property` ne fuite rien — le serveur renvoie alors les données de **tous** les logements de l'utilisateur,
+ce qui n'est simplement pas ce qu'affiche un écran dédié à un logement.
 
 ---
 
@@ -443,20 +699,89 @@ await api('/occupations', {
    ouvrir une issue plutôt que de bidouiller. L'API doit rester consommable par d'autres clients (mobile à venir).
 6. La pluralisation des URLs suit la convention API Platform : `Category → categories`,
    `InventoryItem → inventory_items`, `ShoppingItem → shopping_items`, `Note → notes`, `Occupation → occupations`,
-   `Work → works`, `User → users`.
+   `Work → works`, `User → users`, `DeviceToken → device_tokens`, `Property → properties`,
+   `PropertyMember → property_members`.
+7. **Propager le logement actif** : `?property=<IRI>` sur toutes les lectures métier, champ `property` sur toutes les
+   créations. Le serveur cloisonne de toute façon (§2.5), mais sans le paramètre un écran affiche les données de tous
+   les logements mélangées.
+8. **Recharger sur bascule de logement**, pas seulement au montage : planning, inventaire, courses, notes, travaux et
+   météo dépendent tous du logement actif.
 
 ---
 
 ## 7. Endpoint `/api/me`
 
-`GET /api/me` (sécurité `ROLE_USER`) retourne le profil de l'utilisateur courant, sérialisé avec le groupe `user:read`.
-L'IRI renvoyé pointe vers `/api/users/{id}`. Pas besoin de décoder le JWT côté front pour connaître l'identité du user
-connecté.
+`GET /api/me` (sécurité `ROLE_USER`) retourne le profil de l'utilisateur courant, sérialisé avec les groupes `user:read`
+et `property:summary`. L'IRI renvoyé pointe vers `/api/users/{id}`. Pas besoin de décoder le JWT côté front pour
+connaître l'identité du user connecté.
+
+`memberships` porte les logements de l'utilisateur **embarqués** (pas de simples IRIs) avec son rôle local dans chacun :
+c'est la seule requête nécessaire pour amorcer un sélecteur de logement au démarrage.
+
+```json
+{
+    "@id": "/api/users/2",
+    "id": 2,
+    "uuid": "80d900ea-28d8-4b3e-9342-f23611ed3fe6",
+    "username": "antonin",
+    "email": "antonin@example.com",
+    "roles": ["ROLE_USER"],
+    "memberships": [
+        {
+            "@id": "/api/property_members/8",
+            "role": "manager",
+            "property": {
+                "@id": "/api/properties/1",
+                "id": 1,
+                "name": "Les Tennis",
+                "slug": "les-tennis",
+                "city": "Villard-de-Lans",
+                "latitude": 45.064757765580204,
+                "longitude": 5.548400944891808,
+                "timezone": "Europe/Paris",
+                "accentColor": "forest",
+                "accentHex": "#2E4A39",
+                "archived": false
+            }
+        }
+    ]
+}
+```
 
 ```ts
-const me = await api<User>('/me')
-// → { id: 2, uuid: "...", username: "antonin", roles: ["ROLE_USER"] }
+type PropertySummary = {
+    '@id': string
+    id: number
+    name: string
+    slug: string
+    city: string
+    latitude: number
+    longitude: number
+    timezone: string
+    accentColor: 'forest' | 'lake' | 'wood' | 'slate' | 'plum' | 'lichen'
+    accentHex: string
+    archived: boolean
+}
+
+type Me = {
+    '@id': string
+    id: number
+    uuid: string
+    username: string
+    email: string | null
+    roles: string[]
+    memberships: { role: 'manager' | 'occupant'; property: PropertySummary }[]
+}
+
+const me = await api<Me>('/me')
+const activeProperty = me.memberships[0]?.property['@id'] // → '/api/properties/1'
 ```
+
+Cas limites à gérer côté client :
+
+- `memberships` **vide** : l'utilisateur n'a aucun logement. Afficher un état vide explicite, ne lancer aucun appel métier.
+- **Un seul** logement : ne pas afficher de sélecteur encombrant, le nom du logement suffit.
+- Logement actif mémorisé localement mais **absent** de `memberships` (retiré ou archivé) : replier sur le premier disponible.
 
 Implémenté via `App\State\MeProvider` (cf. `src/State/MeProvider.php`). Si l'utilisateur n'est pas authentifié → `401`.
 
@@ -542,11 +867,14 @@ paramètres se combinent en AND.
 | Ressource       | Search                                                                                           | Date                   | Order                       | Booléen     |
 |-----------------|--------------------------------------------------------------------------------------------------|------------------------|-----------------------------|-------------|
 | `Category`      | `name` (ipartial)                                                                                | —                      | `name`                      | —           |
-| `InventoryItem` | `name` (ipartial), `category` (exact), `state` (exact), `note` (ipartial), `location` (ipartial) | —                      | `name`, `quantity`, `state` | —           |
-| `ShoppingItem`  | `name` (ipartial), `category` (exact)                                                            | —                      | `name`, `purchased`         | `purchased` |
-| `Note`          | `title` (ipartial), `content` (ipartial), `author` (exact), `author.uuid` (exact)                | `createdAt`            | `createdAt`, `title`        | —           |
-| `Occupation`    | `occupant` (exact), `occupant.uuid` (exact), `notes` (ipartial)                                  | `startDate`, `endDate` | `startDate`, `endDate`      | —           |
-| `Work`          | `title` (ipartial), `description` (ipartial), `author.uuid` (exact), `status` (exact), `type` (exact), `priority` (exact) | `createdAt`, `scheduledFor` | `createdAt`, `scheduledFor`, `priority`, `status` | —           |
+| `Room`          | `property` (exact), `name` (ipartial), `type` (exact)                                            | —                      | `position`, `name`          | `archived`  |
+| `Property`      | `name` (ipartial), `slug` (exact), `city` (ipartial)                                             | —                      | `name`, `city`              | `archived`  |
+| `PropertyMember`| `property` (exact), `user` (exact), `user.uuid` (exact), `role` (exact)                          | —                      | —                           | —           |
+| `InventoryItem` | `property` (exact), `room` (exact), `name` (ipartial), `category` (exact), `state` (exact), `note` (ipartial), `location` (ipartial) | —                      | `name`, `quantity`, `state` | —           |
+| `ShoppingItem`  | `property` (exact), `name` (ipartial), `category` (exact)                                                            | —                      | `name`, `purchased`         | `purchased` |
+| `Note`          | `property` (exact), `title` (ipartial), `content` (ipartial), `author` (exact), `author.uuid` (exact)                | `createdAt`            | `createdAt`, `title`        | —           |
+| `Occupation`    | `property` (exact), `occupant` (exact), `occupant.uuid` (exact), `notes` (ipartial)                                  | `startDate`, `endDate` | `startDate`, `endDate`      | —           |
+| `Work`          | `property` (exact), `room` (exact), `title` (ipartial), `description` (ipartial), `author.uuid` (exact), `status` (exact), `type` (exact), `priority` (exact) | `createdAt`, `scheduledFor` | `createdAt`, `scheduledFor`, `priority`, `status` | —           |
 
 ### Exemples
 
@@ -577,3 +905,148 @@ Les filtres apparaissent aussi dans `/api/docs` (Swagger UI) pour chaque collect
 
 - **Création de mot de passe via `POST /api/users`** — actuellement le champ `password` n'est pas dans `user:write` (
   cf. § 4.1).
+
+---
+
+## 11. Notifications (push + e-mail)
+
+Système de notification multi-canal introduit en **v1.2.0**. Deux canaux : **push** (via Expo) et **e-mail** (via le
+mailer Symfony). L'envoi est piloté côté serveur ; le front n'a qu'à **enregistrer son device token** pour recevoir le
+push.
+
+### 11.1 Ce que le client doit faire
+
+1. Obtenir l'Expo push token de l'install (côté app mobile, via `expo-notifications`).
+2. L'enregistrer : `POST /api/device_tokens` avec `{ "token": "ExponentPushToken[…]", "platform": "ios" }` (cf. §4.8).
+   À refaire à chaque login — l'upsert serveur évite les doublons.
+3. (Optionnel) Renseigner l'`email` du user (cf. §4.1) pour recevoir aussi les notifications par e-mail.
+4. Au logout / refus des notifications : `DELETE /api/device_tokens/{id}`.
+
+### 11.2 Notifications émises
+
+| Notification        | Déclencheur                              | Canaux        | Destinataire      |
+|---------------------|------------------------------------------|---------------|-------------------|
+| Fin de séjour       | Occupation dont `endDate` = aujourd'hui  | push + e-mail | l'`occupant`      |
+
+- Le push est envoyé à **tous les device tokens** de l'occupant ; l'e-mail à son `email` s'il est renseigné. Un canal
+  qui échoue n'empêche pas les autres (`Notifier` tolère les erreurs par canal).
+- L'envoi de la notification de fin de séjour est **idempotent** : l'occupation est estampillée `endNotifiedAt`
+  (cf. §4.6) une fois notifiée, donc relancer la commande ne renvoie jamais deux fois.
+
+### 11.3 Déclenchement serveur (cron)
+
+La notification de fin de séjour est dispatchée **une fois par jour**. Deux points d'entrée équivalents, qui partagent
+la même logique (`OccupationEndNotificationDispatcher`) :
+
+**a) Commande CLI** — pour un cron disposant d'un shell (SSH / VPS) ou pour tester :
+
+```bash
+php bin/console app:notifications:dispatch-occupation-end
+# option de test : --date=2026-07-15 pour rejouer un jour de référence donné
+```
+
+**b) Endpoint HTTP** — `GET /api/cron/occupation-end-notifications` — pour un planificateur qui ne sait qu'appeler une
+URL (cas du planificateur de tâches Infomaniak en hébergement mutualisé).
+
+| Élément        | Valeur                                                                              |
+|----------------|-------------------------------------------------------------------------------------|
+| Méthode        | `GET`                                                                               |
+| Auth           | **Public** (`PUBLIC_ACCESS`), protégé par un secret partagé en query string         |
+| Query          | `token` — doit être égal à `APP_CRON_SECRET` côté serveur (comparé en constant-time) |
+| `200`          | `{ "date": "2026-07-15", "dispatched": 2 }`                                         |
+| `403`          | token absent ou invalide                                                            |
+
+```bash
+curl "https://<api>/api/cron/occupation-end-notifications?token=<APP_CRON_SECRET>"
+# -> {"date":"2026-06-11","dispatched":0}
+```
+
+Configuration côté Infomaniak (Hébergement → Web → Planificateur de tâches) : URL à exécuter =
+`https://<api>/api/cron/occupation-end-notifications?token=<APP_CRON_SECRET>`, fréquence **1×/jour**. Le secret en clair
+dans l'URL doit être identique à `APP_CRON_SECRET` (défini en prod via `.env.prod.local`, jamais commité).
+
+> Le front n'appelle ni la commande ni cet endpoint — c'est purement backend. Côté client, seule l'inscription du device
+> token (§4.8) et l'`email` (§4.1) conditionnent la réception. L'envoi reste **idempotent** quel que soit le point
+> d'entrée, donc déclencher plusieurs fois par jour est sans risque.
+
+---
+
+## 12. Endpoint `/api/weather` — météo du logement
+
+`GET /api/weather?property=<IRI>` (sécurité `IS_AUTHENTICATED_FULLY`). Ressource **singleton en lecture seule**,
+alimentée par [Open-Meteo](https://open-meteo.com) (pas de clé d'API), cachée **30 minutes par logement**.
+
+Les coordonnées sont portées par le logement lui-même, plus par une variable d'environnement. Chaque logement peut
+suivre deux points :
+
+| `key` | Ce que c'est | Toujours présent ? |
+|-------|--------------|--------------------|
+| `main` | Le logement lui-même (`latitude` / `longitude` de la `Property`) | oui |
+| `secondary` | Point secondaire optionnel, typiquement un domaine d'altitude | seulement si les trois champs `secondary*` sont renseignés |
+
+> ⚠️ **Ne pas coder en dur une clé de logement précis.** Les clés `main` / `secondary` sont stables d'un logement à
+> l'autre ; un logement sans point secondaire ne renvoie qu'une entrée, et le client doit le gérer.
+
+Le paramètre `property` suit la même règle que les créations (§2.5) : facultatif tant que l'utilisateur n'a qu'un seul
+logement, obligatoire au-delà.
+
+| Situation | Réponse |
+|-----------|---------|
+| `?property=` sur un logement autorisé | `200` |
+| `?property=` sur un logement non autorisé | `403` |
+| `?property=` sur un logement inexistant | `404` |
+| pas de `?property=`, utilisateur mono-logement | `200` — logement déduit |
+| pas de `?property=`, utilisateur multi-logements | `422` |
+
+**Réponse 200** (tronquée) :
+
+```json
+{
+    "timezone": "Europe/Paris",
+    "locations": [
+        {
+            "key": "main",
+            "name": "Les Tennis",
+            "latitude": 45.064757765580204,
+            "longitude": 5.548400944891808,
+            "elevation": 996,
+            "current": {
+                "temperature": 19.8,
+                "apparentTemperature": 19.1,
+                "weatherCode": 3,
+                "windSpeed": 7.2,
+                "humidity": 62,
+                "snowDepth": 0,
+                "time": "2026-08-10T18:00"
+            },
+            "daily": [
+                {
+                    "date": "2026-08-10",
+                    "weatherCode": 3,
+                    "tempMin": 12.4,
+                    "tempMax": 24.1,
+                    "precipitation": 0.2,
+                    "snowfall": 0,
+                    "windMax": 14.8,
+                    "uvMax": 6.3
+                }
+            ],
+            "airQuality": {"europeanAqi": 21, "pm25": 4.1, "pm10": 8.7}
+        },
+        {
+            "key": "secondary",
+            "name": "Côte 2000",
+            "elevation": 1987,
+            "…": "même structure"
+        }
+    ]
+}
+```
+
+- `timezone` — celui du logement, pas celui du serveur ni du client.
+- `daily` — 16 jours (horizon maximum de l'offre gratuite Open-Meteo).
+- `elevation` — altitude renvoyée par Open-Meteo pour le point, utile pour expliquer l'écart entre les deux points.
+- `snowDepth` (m) et `snowfall` (cm) — pertinents en montagne, à `0` ailleurs.
+
+En cas d'indisponibilité d'Open-Meteo, l'API renvoie `502` avec un message explicite : à traiter comme une panne
+transitoire côté client (masquer le widget, ne pas bloquer l'écran).
