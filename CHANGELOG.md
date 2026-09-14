@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-15
+
 ### Added
 
 - Photos on notes and works: up to 10 per item, added or removed from the edit modal and only sent on save, so
@@ -96,13 +98,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial release.
-  [unreleased]: https://github.com/marmottes-industries/villard-front/compare/v1.5.0...main
-  [1.5.0]: https://github.com/marmottes-industries/villard-front/compare/v1.4.0...v1.5.0
-  [1.4.0]: https://github.com/marmottes-industries/villard-front/compare/v1.3.0...v1.4.0
-  [1.3.0]: https://github.com/marmottes-industries/villard-front/compare/v1.2.0...v1.3.0
-  [1.2.0]: https://github.com/marmottes-industries/villard-front/compare/v1.1.3...v1.2.0
-  [1.1.3]: https://github.com/marmottes-industries/villard-front/compare/v1.1.2...v1.1.3
-  [1.1.2]: https://github.com/marmottes-industries/villard-front/compare/1.1.1...v1.1.2
-  [1.1.1]: https://github.com/marmottes-industries/villard-front/compare/1.1.0...1.1.1
-  [1.1.0]: https://github.com/marmottes-industries/villard-front/compare/1.0.0...1.1.0
-  [1.0.0]: https://github.com/marmottes-industries/villard-front/compare/main...1.0.0
+
+[unreleased]: https://github.com/marmottes-industries/villard-front/compare/v1.6.0...main
+[1.6.0]: https://github.com/marmottes-industries/villard-front/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/marmottes-industries/villard-front/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/marmottes-industries/villard-front/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/marmottes-industries/villard-front/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/marmottes-industries/villard-front/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/marmottes-industries/villard-front/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/marmottes-industries/villard-front/compare/1.1.1...v1.1.2
+[1.1.1]: https://github.com/marmottes-industries/villard-front/compare/1.1.0...1.1.1
+[1.1.0]: https://github.com/marmottes-industries/villard-front/compare/1.0.0...1.1.0
+[1.0.0]: https://github.com/marmottes-industries/villard-front/compare/main...1.0.0
