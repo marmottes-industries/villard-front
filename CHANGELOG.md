@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Photos on notes and works: up to 10 per item, added or removed from the edit modal and only sent on save, so
+  cancelling leaves nothing on the server. Thumbnails on cards open the full photo in a new tab.
+- JPEG, PNG and WebP only, 15 MB max per file, checked before upload. The API compresses anything above 1 MB.
+- If some photos fail to upload, the note or work is still saved and a banner says which operation failed.
+
+### Fixed
+
+- The note modal no longer stays stuck on « Enregistrement… » when saving or deleting fails. The error now shows
+  inside the modal, with the input kept, so the user can retry.
+
+### Requires
+
+- API with `/api/images` (villard-api, next release).
+
 ## [1.5.0] - 2026-08-12
 
 ### Added

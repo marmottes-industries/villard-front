@@ -1,4 +1,5 @@
 import { apiClient } from '@/api/client'
+import type { ImageRef } from '@/api/images'
 
 export type WorkStatus = 'suggested' | 'planned' | 'in_progress' | 'done' | 'cancelled'
 export type WorkType = 'diy' | 'pro'
@@ -21,6 +22,7 @@ export type Work = {
     actualCost: number | null
     room: string | null // IRI '/api/rooms/{id}' — null si non localisés
     property: string // IRI '/api/properties/{id}'
+    images: ImageRef[] // lecture seule, cf. API.md §4.12
 }
 
 // `author` est renseigné côté serveur : inutile de l'envoyer.
@@ -43,6 +45,9 @@ export const worksApi = {
     // `property` restreint au logement actif (cf. API.md §2.5).
     list(property: string) {
         return apiClient.get<Work[]>('/api/works', { params: { property } })
+    },
+    get(id: number) {
+        return apiClient.get<Work>(`/api/works/${id}`)
     },
     create(payload: WorkCreatePayload) {
         return apiClient.post<Work>('/api/works', payload)

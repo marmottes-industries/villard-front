@@ -1,4 +1,5 @@
 import { apiClient } from '@/api/client'
+import type { ImageRef } from '@/api/images'
 
 export type Note = {
     '@id': string
@@ -9,6 +10,7 @@ export type Note = {
     createdAt: string
     author: string
     property: string // IRI '/api/properties/{id}'
+    images: ImageRef[] // lecture seule, cf. API.md §4.12
 }
 
 // `author` est renseigné côté serveur : inutile de l'envoyer.
@@ -24,6 +26,9 @@ export const notesApi = {
     // `property` restreint au logement actif (cf. API.md §2.5).
     list(property: string) {
         return apiClient.get<Note[]>('/api/notes', { params: { property } })
+    },
+    get(id: number) {
+        return apiClient.get<Note>(`/api/notes/${id}`)
     },
     create(payload: NoteCreatePayload) {
         return apiClient.post<Note>('/api/notes', payload)

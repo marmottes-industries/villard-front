@@ -7,6 +7,7 @@ import {
     type NoteCreatePayload,
     type NoteUpdatePayload,
 } from '@/api/notes'
+import { applyImageChanges, type ImageChanges } from '@/api/images'
 import { usePropertiesStore } from '@/stores/properties'
 
 type AsyncState = 'idle' | 'loading' | 'error' | 'success'
@@ -41,18 +42,38 @@ export function useNotes() {
         }
     }
 
-    async function create(payload: Omit<NoteCreatePayload, 'property'>) {
+    /**
+     * Les images sont traitées après l'enregistrement du parent, dont elles ont
+     * besoin de l'IRI. Un échec sur les images n'annule pas l'enregistrement :
+     * il est renvoyé dans `imageError` pour que la vue le signale.
+     */
+    async function create(payload: Omit<NoteCreatePayload, 'property'>, images?: ImageChanges) {
         const property = activePropertyIri.value
         if (!property) throw new Error('Aucun logement actif.')
         const { data } = await notesApi.create({ ...payload, property })
         items.value = [data, ...items.value]
-        return data
+        const imageError = await syncImages(data, images)
+        return { note: data, imageError }
     }
 
-    async function update(id: number, payload: NoteUpdatePayload) {
+    async function update(id: number, payload: NoteUpdatePayload, images?: ImageChanges) {
         const { data } = await notesApi.update(id, payload)
         items.value = items.value.map(n => (n.id === id ? data : n))
-        return data
+        const imageError = await syncImages(data, images)
+        return { note: data, imageError }
+    }
+
+    async function syncImages(item: Note, images?: ImageChanges): Promise<string | null> {
+        if (!images || (!images.newFiles.length && !images.removedImageIds.length)) return null
+        const imageError = await applyImageChanges({ note: item['@id'] }, images)
+        // Relecture pour récupérer les images et leurs URLs signées.
+        try {
+            const { data } = await notesApi.get(item.id)
+            items.value = items.value.map(n => (n.id === item.id ? data : n))
+        } catch {
+            // Sans gravité : la liste se remettra à jour au prochain chargement.
+        }
+        return imageError
     }
 
     async function remove(id: number) {

@@ -37,6 +37,7 @@ const query = ref('')
 const statusFilter = ref<WorkStatus | 'all' | 'open'>('open')
 const yearFilter = ref<number | 'all'>('all')
 const modalSaveError = ref<string | null>(null)
+const actionError = ref<string | null>(null)
 
 const modalOpen = ref(false)
 const modalInitial = ref<ModalInitial | null>(null)
@@ -158,6 +159,7 @@ function closeModal() {
 
 async function onSave(payload: WorkSavePayload) {
   modalSaveError.value = null
+  actionError.value = null
   try {
     const body = {
       title: payload.title,
@@ -170,12 +172,12 @@ async function onSave(payload: WorkSavePayload) {
       actualCost: payload.actualCost,
       room: payload.room,
     }
-    if (payload.id === null) {
-      await works.create(body)
-    } else {
-      await works.update(payload.id, body)
-    }
+    const { imageError } = payload.id === null
+      ? await works.create(body, payload.images)
+      : await works.update(payload.id, body, payload.images)
     closeModal()
+    // Les travaux sont enregistrés : un échec sur les photos se signale sans rouvrir la modale.
+    if (imageError) actionError.value = `Travaux enregistrés. ${imageError}`
   } catch (err) {
     modalSaveError.value = formatError(err)
   }
@@ -238,6 +240,11 @@ async function retryInitial() {
       </div>
 
       <template v-else>
+        <div v-if="actionError" class="action-error">
+          <Icon name="alert" :size="15" />
+          {{ actionError }}
+        </div>
+
         <div v-if="doneWorks.length" class="stats-bar">
           <div class="stat">
             <span class="stat-label">Coût réel cumulé</span>
@@ -325,6 +332,18 @@ async function retryInitial() {
 .muted-icon { color: var(--ink-3); }
 .pad-center { padding: 48px; text-align: center; }
 .error-msg { color: var(--replace); margin-bottom: 16px; }
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--replace-bg);
+  color: #8c3a2e;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
 
 .stats-bar {
   display: flex;

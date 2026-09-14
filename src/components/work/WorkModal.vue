@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
+import ImageAttachments from '@/components/images/ImageAttachments.vue'
+import type { ImageChanges } from '@/api/images'
 import type {
   Work,
   WorkPriority,
@@ -32,6 +34,7 @@ export type WorkSavePayload = {
   estimatedCost: number | null
   actualCost: number | null
   room: string | null
+  images: ImageChanges
 }
 
 const props = defineProps<{
@@ -58,12 +61,17 @@ const room = ref<string | null>(null)
 const scheduledFor = ref('')
 const estimatedCost = ref<number | null>(null)
 const actualCost = ref<number | null>(null)
+const newFiles = ref<File[]>([])
+const removedImageIds = ref<number[]>([])
 const errorMessage = ref<string | null>(null)
 const saving = ref(false)
 
 const isEditing = computed(() => props.initial?.mode === 'edit')
 const editingId = computed(() =>
   props.initial?.mode === 'edit' ? props.initial.work.id : null,
+)
+const existingImages = computed(() =>
+  props.initial?.mode === 'edit' ? props.initial.work.images : [],
 )
 
 watch(() => props.saveError, (err) => {
@@ -77,6 +85,8 @@ watch(() => props.open, (open) => {
   if (!open) return
   errorMessage.value = null
   saving.value = false
+  newFiles.value = []
+  removedImageIds.value = []
   const init = props.initial
   if (!init) return
   if (init.mode === 'edit') {
@@ -138,6 +148,7 @@ function onSave() {
     estimatedCost: normalizeCost(estimatedCost.value),
     actualCost: normalizeCost(actualCost.value),
     room: room.value,
+    images: { newFiles: newFiles.value, removedImageIds: removedImageIds.value },
   })
 }
 
@@ -306,6 +317,16 @@ function toggleRoom(iri: string) {
             />
           </div>
         </div>
+
+        <label class="fld-label">
+          Photos <span class="muted optional">· optionnel</span>
+        </label>
+        <ImageAttachments
+          v-model:new-files="newFiles"
+          v-model:removed-ids="removedImageIds"
+          :existing="existingImages"
+          :disabled="saving"
+        />
 
         <div v-if="errorMessage" class="modal-err">
           <Icon name="alert" :size="15" />

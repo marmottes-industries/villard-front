@@ -1,38 +1,62 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
+import ImageAttachments from '@/components/images/ImageAttachments.vue'
 import type { Note } from '@/api/notes'
+import type { ImageChanges } from '@/api/images'
 
 export type ModalInitial =
   | { mode: 'create' }
   | { mode: 'edit'; note: Note }
 
+/*
+ * L'état d'envoi et l'erreur serveur viennent du parent, seul à savoir quand
+ * la requête se termine. Un `saving` interne restait bloqué à `true` après un
+ * échec : la modale affichait « Enregistrement… » sans jamais rendre la main.
+ */
 const props = defineProps<{
   open: boolean
   initial: ModalInitial | null
   canDelete: boolean
+  submitting?: boolean
+  saveError?: string | null
 }>()
+
+export type NoteSavePayload = {
+  id: number | null
+  title: string
+  content: string
+  images: ImageChanges
+}
 
 const emit = defineEmits<{
   close: []
-  save: [payload: { id: number | null; title: string; content: string }]
+  save: [payload: NoteSavePayload]
   remove: [id: number]
 }>()
 
 const title = ref('')
 const content = ref('')
+const newFiles = ref<File[]>([])
+const removedImageIds = ref<number[]>([])
+// Erreurs de saisie locales ; celles du serveur arrivent par `saveError`.
 const errorMessage = ref<string | null>(null)
-const saving = ref(false)
+const saving = computed(() => props.submitting ?? false)
+const displayedError = computed(() => errorMessage.value ?? props.saveError ?? null)
 
 const isEditing = computed(() => props.initial?.mode === 'edit')
 const editingId = computed(() =>
   props.initial?.mode === 'edit' ? props.initial.note.id : null,
 )
+const existingImages = computed(() =>
+  props.initial?.mode === 'edit' ? props.initial.note.images : [],
+)
 
 watch(() => props.open, (open) => {
   if (!open) return
   errorMessage.value = null
-  saving.value = false
+  newFiles.value = []
+  removedImageIds.value = []
   const init = props.initial
   if (!init) return
   if (init.mode === 'edit') {
@@ -54,11 +78,11 @@ function onSave() {
     errorMessage.value = 'Renseigne un contenu.'
     return
   }
-  saving.value = true
   emit('save', {
     id: editingId.value,
     title: title.value.trim(),
     content: content.value.trim(),
+    images: { newFiles: newFiles.value, removedImageIds: removedImageIds.value },
   })
 }
 
@@ -102,9 +126,19 @@ function onDelete() {
           rows="6"
         />
 
-        <div v-if="errorMessage" class="modal-err">
+        <label class="fld-label">
+          Photos <span class="muted optional">· optionnel</span>
+        </label>
+        <ImageAttachments
+          v-model:new-files="newFiles"
+          v-model:removed-ids="removedImageIds"
+          :existing="existingImages"
+          :disabled="saving"
+        />
+
+        <div v-if="displayedError" class="modal-err">
           <Icon name="alert" :size="15" />
-          {{ errorMessage }}
+          {{ displayedError }}
         </div>
       </div>
 
@@ -112,6 +146,7 @@ function onDelete() {
         <button
           v-if="isEditing && canDelete"
           class="btn ghost danger"
+          :disabled="saving"
           @click="onDelete"
         >
           <Icon name="trash" :size="16" />
@@ -136,6 +171,9 @@ function onDelete() {
   font-family: var(--sans);
   line-height: 1.45;
   min-height: 120px;
+}
+.optional {
+  font-weight: 400;
 }
 .danger {
   color: var(--replace);

@@ -37,6 +37,7 @@ export const ICONS: Record<string, string> = {
   logout: `<path d="M14.5 7V5.5A2 2 0 0 0 12.5 3.5h-6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V17" ${P}/><path d="M9 12h12M17 8l4 4-4 4" ${P}/>`,
   menu: `<path d="M4 6.5h16M4 12h16M4 17.5h16" ${P}/>`,
   mobile: `<rect x="6.5" y="2.5" width="11" height="19" rx="2.5" ${P}/><path d="M10.5 18.5h3" ${P}/>`,
+  image: `<rect x="3.5" y="4.5" width="17" height="15" rx="2.5" ${P}/><circle cx="9" cy="10" r="1.8" ${P}/><path d="m20.5 16-4.5-4.5-8.5 8" ${P}/>`,
   note: `<path d="M6 3.5h9L19 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1-1.5z" ${P}/><path d="M14.5 3.5V8h4.5M8.5 12.5h7M8.5 16h5" ${P}/>`,
   hammer: `<path d="M14 6.5l3.5-3.5 3.5 3.5-3.5 3.5-1.5-1.5-7.5 7.5-2-2 7.5-7.5z" ${P}/><path d="M9.5 14.5 4 20l1.5 1.5L11 16" ${P}/>`,
   door: `<path d="M6 20.5V4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v16" ${P}/><path d="M4 20.5h16" ${P}/><path d="M14.5 12h.01" ${P}/>`,

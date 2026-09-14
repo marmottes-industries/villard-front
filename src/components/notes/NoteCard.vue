@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
+import ImageStrip from '@/components/images/ImageStrip.vue'
 import type { Note } from '@/api/notes'
 import type { DisplayUser } from '@/composable/useUsers'
 
@@ -66,6 +67,7 @@ function onClick() {
       </button>
     </header>
     <p class="note-content">{{ note.content }}</p>
+    <ImageStrip :images="note.images" />
   </article>
 </template>
 

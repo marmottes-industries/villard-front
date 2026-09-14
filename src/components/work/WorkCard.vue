@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
+import ImageStrip from '@/components/images/ImageStrip.vue'
 import type { Work } from '@/api/work'
 import type { DisplayUser } from '@/composable/useUsers'
 import { PRIORITY_META, STATUS_META, TYPE_META } from '@/utils/workMeta'
@@ -95,6 +96,8 @@ function onClick() {
     </header>
 
     <p v-if="work.description" class="work-content">{{ work.description }}</p>
+
+    <ImageStrip :images="work.images" />
 
     <div class="work-tags">
       <span class="tag" :class="`tone-${status.tone}`">

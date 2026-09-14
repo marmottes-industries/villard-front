@@ -4,7 +4,7 @@ import { formatError } from '@/utils/formatError'
 import AppTopbar from '@/components/shell/AppTopbar.vue'
 import Icon from '@/components/icons/Icon.vue'
 import NoteCard from '@/components/notes/NoteCard.vue'
-import NoteModal, { type ModalInitial } from '@/components/notes/NoteModal.vue'
+import NoteModal, { type ModalInitial, type NoteSavePayload } from '@/components/notes/NoteModal.vue'
 import { useNotes } from '@/composable/useNotes'
 import { useUsers } from '@/composable/useUsers'
 import { useAuthStore } from '@/stores/auth'
@@ -27,6 +27,8 @@ const query = ref('')
 const actionError = ref<string | null>(null)
 
 const modalOpen = ref(false)
+const submitting = ref(false)
+const modalSaveError = ref<string | null>(null)
 const modalInitial = ref<ModalInitial | null>(null)
 
 const initialState = computed(() => {
@@ -73,32 +75,40 @@ function onEdit(note: Note) {
 function closeModal() {
   modalOpen.value = false
   modalInitial.value = null
+  modalSaveError.value = null
 }
 
-async function onSave(payload: { id: number | null; title: string; content: string }) {
+async function onSave(payload: NoteSavePayload) {
   actionError.value = null
+  modalSaveError.value = null
+  submitting.value = true
   try {
-    if (payload.id === null) {
-      await notes.create({ title: payload.title, content: payload.content })
-    } else {
-      await notes.update(payload.id, {
-        title: payload.title,
-        content: payload.content,
-      })
-    }
+    const body = { title: payload.title, content: payload.content }
+    const { imageError } = payload.id === null
+      ? await notes.create(body, payload.images)
+      : await notes.update(payload.id, body, payload.images)
     closeModal()
+    // La note est enregistrée : un échec sur les photos se signale sans rouvrir la modale.
+    if (imageError) actionError.value = `Note enregistrée. ${imageError}`
   } catch (err) {
-    actionError.value = formatError(err)
+    // La modale reste ouverte avec la saisie intacte : l'utilisateur peut réessayer.
+    modalSaveError.value = formatError(err)
+  } finally {
+    submitting.value = false
   }
 }
 
 async function onRemove(id: number) {
   actionError.value = null
+  modalSaveError.value = null
+  submitting.value = true
   try {
     await notes.remove(id)
     closeModal()
   } catch (err) {
-    actionError.value = formatError(err)
+    modalSaveError.value = formatError(err)
+  } finally {
+    submitting.value = false
   }
 }
 const canDeleteCurrent = computed(() => {
@@ -178,6 +188,8 @@ async function retryInitial() {
     :open="modalOpen"
     :initial="modalInitial"
     :can-delete="canDeleteCurrent"
+    :submitting="submitting"
+    :save-error="modalSaveError"
     @close="closeModal"
     @save="onSave"
     @remove="onRemove"
